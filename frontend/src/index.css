@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-primary: #f0faf0;
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: #e8f5e8;
+  --color-accent: #16a34a;
+  --color-accent-dim: #166534;
+  --color-accent-bright: #22c55e;
+  --color-glass: rgba(255, 255, 255, 0.75);
+  --color-glass-hover: rgba(255, 255, 255, 0.9);
+  --color-glass-border: rgba(22, 163, 74, 0.18);
+  --color-glass-border-hover: rgba(22, 163, 74, 0.4);
+  --color-severity-low: #16a34a;
+  --color-severity-medium: #d97706;
+  --color-severity-high: #ea580c;
+  --color-severity-critical: #dc2626;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg-primary);
+  color: #1e293b;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+.glass {
+  background: var(--color-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--color-glass-border);
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(22, 163, 74, 0.04);
+}
+
+.glass-sm {
+  background: var(--color-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--color-glass-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(22, 163, 74, 0.03);
+}
+
+.glass:hover,
+.glass-sm:hover {
+  border-color: var(--color-glass-border-hover);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 4px 20px rgba(22, 163, 74, 0.08);
+}
+
+.glow-green {
+  box-shadow: 0 0 16px rgba(22, 163, 74, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.glow-green-strong {
+  box-shadow: 0 0 20px rgba(22, 163, 74, 0.2), 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.glow-red {
+  box-shadow: 0 0 16px rgba(220, 38, 38, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.glow-amber {
+  box-shadow: 0 0 12px rgba(217, 119, 6, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
+}
+
+.pulse-live {
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(22, 163, 74, 0.18); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(22, 163, 74, 0.35); }
+
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(22, 163, 74, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(22, 163, 74, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}

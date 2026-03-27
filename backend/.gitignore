@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.pyc
+.env
+itops.db
+chroma_db/
+*.egg-info/
+dist/
+build/
+.tmp/
+.virtualenv-app-data/
+devserver.out.log
+devserver.err.log
