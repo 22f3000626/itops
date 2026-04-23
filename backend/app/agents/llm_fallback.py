@@ -11,6 +11,7 @@ unreachable Ollama server never breaks the pipeline — it simply falls
 back to the generic deterministic output.
 """
 
+import asyncio
 import json
 import logging
 
@@ -25,8 +26,8 @@ def _model() -> str:
     return _settings.ollama_model or "gemma3:4b"
 
 
-def _call_llm(prompt: str, *, temperature: float = 0.1) -> dict | None:
-    """Send a prompt to Ollama expecting a JSON object back."""
+def _sync_call_llm(prompt: str, *, temperature: float = 0.1) -> dict | None:
+    """Blocking Ollama call. Do not invoke directly from async code."""
     try:
         response = ollama.chat(
             model=_model(),
@@ -42,6 +43,11 @@ def _call_llm(prompt: str, *, temperature: float = 0.1) -> dict | None:
     except Exception as exc:
         logger.warning("LLM call failed (Ollama may be offline): %s", exc)
         return None
+
+
+async def _call_llm(prompt: str, *, temperature: float = 0.1) -> dict | None:
+    """Async wrapper that runs the blocking Ollama call off the event loop."""
+    return await asyncio.to_thread(_sync_call_llm, prompt, temperature=temperature)
 
 
 # ── Diagnostic fallback ─────────────────────────────────────────────
@@ -101,7 +107,7 @@ async def llm_diagnose(
         reasons="; ".join(reasons[:5]) if reasons else "none",
         past_context_section=past_section or "No past incidents available for reference.",
     )
-    result = _call_llm(prompt)
+    result = await _call_llm(prompt)
     if not result or "root_cause" not in result:
         return None
 
@@ -195,7 +201,7 @@ async def llm_remediate(
         metrics_summary=json.dumps(key_metrics),
         past_context_section=past_section or "No past incidents available for reference.",
     )
-    result = _call_llm(prompt)
+    result = await _call_llm(prompt)
     if not result or "steps" not in result:
         return None
 
@@ -284,7 +290,7 @@ async def llm_predict_impact(
         anomaly_type=anomaly_type,
         metrics_summary=json.dumps(key_metrics),
     )
-    result = _call_llm(prompt)
+    result = await _call_llm(prompt)
     if not result or "predicted_impact" not in result:
         return None
     return {

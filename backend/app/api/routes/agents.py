@@ -26,6 +26,41 @@ logger = logging.getLogger("itops.api.agents")
 router = APIRouter(prefix="/agents", tags=["Agents"])
 _pipeline_runs: dict[str, dict] = {}
 
+
+def _persist_pipeline_incident(metrics: dict, state: dict) -> int | None:
+    """Persist a pipeline result as an incident. Runs on a worker thread."""
+    db = SessionLocal()
+    try:
+        infra_svc = InfraService(db)
+        incident_svc = IncidentService(db)
+        node = infra_svc.get_node_by_name(metrics.get("node_name", ""))
+        if not node:
+            event = MetricEvent(
+                node_name=metrics.get("node_name", "custom-node"),
+                node_type=metrics.get("node_type", "server"),
+                provider=metrics.get("provider", "manual"),
+                region=metrics.get("region", "unknown"),
+                ip_address=metrics.get("ip_address", "0.0.0.0"),
+                cpu_percent=metrics.get("cpu_percent", 0),
+                memory_percent=metrics.get("memory_percent", 0),
+                disk_percent=metrics.get("disk_percent", 0),
+                network_in_mbps=metrics.get("network_in_mbps", 0),
+                network_out_mbps=metrics.get("network_out_mbps", 0),
+                request_rate=metrics.get("request_rate", 0),
+                error_rate=metrics.get("error_rate", 0),
+                latency_ms=metrics.get("latency_ms", 0),
+            )
+            node = infra_svc.ensure_node_exists(event)
+            db.commit()
+
+        incident = incident_svc.create_incident_from_pipeline(node.id, state)
+        return incident.id
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
 # ── Agent registry (for frontend display) ───────────────────────────
 
 AGENT_REGISTRY = [
@@ -154,38 +189,12 @@ async def _run_pipeline_job(run_id: str, metrics: dict, metric_history: str, log
 
     incident_id = None
     if state.get("is_anomaly"):
-        db = SessionLocal()
         try:
-            infra_svc = InfraService(db)
-            incident_svc = IncidentService(db)
-            node = infra_svc.get_node_by_name(metrics.get("node_name", ""))
-            if not node:
-                event = MetricEvent(
-                    node_name=metrics.get("node_name", "custom-node"),
-                    node_type=metrics.get("node_type", "server"),
-                    provider=metrics.get("provider", "manual"),
-                    region=metrics.get("region", "unknown"),
-                    ip_address=metrics.get("ip_address", "0.0.0.0"),
-                    cpu_percent=metrics.get("cpu_percent", 0),
-                    memory_percent=metrics.get("memory_percent", 0),
-                    disk_percent=metrics.get("disk_percent", 0),
-                    network_in_mbps=metrics.get("network_in_mbps", 0),
-                    network_out_mbps=metrics.get("network_out_mbps", 0),
-                    request_rate=metrics.get("request_rate", 0),
-                    error_rate=metrics.get("error_rate", 0),
-                    latency_ms=metrics.get("latency_ms", 0),
-                )
-                node = infra_svc.ensure_node_exists(event)
-                db.commit()
-
-            incident = incident_svc.create_incident_from_pipeline(node.id, state)
-            incident_id = incident.id
+            incident_id = await asyncio.to_thread(_persist_pipeline_incident, metrics, state)
         except Exception as e:
             logger.error(f"Async pipeline persistence failed for run {run_id}: {e}", exc_info=True)
             run["error"] = str(e)
             run["status"] = "failed"
-        finally:
-            db.close()
 
     run["result"] = _build_pipeline_result(state, incident_id)
     run["completed_at"] = state.get("completed_at") or datetime.datetime.utcnow().isoformat()
@@ -239,10 +248,7 @@ async def trigger_pipeline(
     Provide either a node_name (to use current simulated data)
     or custom_metrics dict for testing.
     """
-    infra_svc = InfraService(db)
-    incident_svc = IncidentService(db)
     metrics, metric_history, log_history = _resolve_pipeline_context(body, db)
-    node = infra_svc.get_node_by_name(metrics.get("node_name", ""))
 
     # Run the full pipeline
     logger.info(f"Triggering pipeline for: {metrics.get('node_name', 'custom')}")
@@ -251,27 +257,7 @@ async def trigger_pipeline(
     # Persist incident if anomaly was detected
     incident_id = None
     if state.get("is_anomaly"):
-        if not node:
-            event = MetricEvent(
-                node_name=metrics.get("node_name", "custom-node"),
-                node_type=metrics.get("node_type", "server"),
-                provider=metrics.get("provider", "manual"),
-                region=metrics.get("region", "unknown"),
-                ip_address=metrics.get("ip_address", "0.0.0.0"),
-                cpu_percent=metrics.get("cpu_percent", 0),
-                memory_percent=metrics.get("memory_percent", 0),
-                disk_percent=metrics.get("disk_percent", 0),
-                network_in_mbps=metrics.get("network_in_mbps", 0),
-                network_out_mbps=metrics.get("network_out_mbps", 0),
-                request_rate=metrics.get("request_rate", 0),
-                error_rate=metrics.get("error_rate", 0),
-                latency_ms=metrics.get("latency_ms", 0),
-            )
-            node = infra_svc.ensure_node_exists(event)
-            db.commit()
-
-        incident = incident_svc.create_incident_from_pipeline(node.id, state)
-        incident_id = incident.id
+        incident_id = await asyncio.to_thread(_persist_pipeline_incident, metrics, state)
 
     return PipelineResult(**_build_pipeline_result(state, incident_id))
 
@@ -329,8 +315,7 @@ async def trigger_pipeline_all_nodes(db: Session = Depends(get_db)):
                 infra_svc.update_node_status(node, "degraded")
             db.commit()
 
-            incident = incident_svc.create_incident_from_pipeline(node.id, state)
-            incident_id = incident.id
+            incident_id = await asyncio.to_thread(_persist_pipeline_incident, metrics, state)
         else:
             infra_svc.update_node_status(node, "healthy")
             db.commit()

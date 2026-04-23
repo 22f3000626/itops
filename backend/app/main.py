@@ -128,22 +128,30 @@ def _simulator_log_event(simulator_name: str, line: str) -> LogEvent:
     )
 
 
+def _persist_incident_sync(node_id: int, state: dict) -> None:
+    """Create the incident record in a worker thread so the event loop is not blocked."""
+    from app.services.incident_service import IncidentService
+    db = SessionLocal()
+    try:
+        incident_svc = IncidentService(db)
+        incident_svc.create_incident_from_pipeline(node_id, state)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 async def _run_pipeline_background(node_id: int, node_name: str, full_metrics: dict, metric_history: str, log_history: str):
     """Run the LLM pipeline in the background so the monitoring loop is not blocked."""
     try:
         state = await run_pipeline(full_metrics, metric_history, log_history)
         if state.get("is_anomaly"):
-            db = SessionLocal()
             try:
-                from app.services.incident_service import IncidentService
-                incident_svc = IncidentService(db)
-                incident_svc.create_incident_from_pipeline(node_id, state)
-                db.commit()
+                await asyncio.to_thread(_persist_incident_sync, node_id, state)
             except Exception as e:
                 logger.error(f"Incident creation error for {node_name}: {e}")
-                db.rollback()
-            finally:
-                db.close()
     except Exception as e:
         logger.error(f"Pipeline error for {node_name}: {e}")
 

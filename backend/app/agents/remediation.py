@@ -7,6 +7,7 @@ deterministic templates so fixes can be reviewed and downloaded
 without waiting on another model call.
 """
 
+import asyncio
 import re
 import logging
 
@@ -304,14 +305,16 @@ KNOWN_ISSUE_TYPES = {
 }
 
 
-def _similar_remediation_context(issue_type: str, root_cause: str) -> tuple[str, bool]:
+async def _similar_remediation_context(issue_type: str, root_cause: str) -> tuple[str, bool]:
     """Search past incidents and runbooks for similar remediation context."""
     try:
         from app.memory.vector_store import get_memory
         memory = get_memory()
         query = f"{issue_type} {root_cause}"
-        similar = memory.search_similar_incidents(query, n_results=3)
-        runbooks = memory.search_runbooks(query, n_results=2)
+        similar, runbooks = await asyncio.gather(
+            asyncio.to_thread(memory.search_similar_incidents, query, 3),
+            asyncio.to_thread(memory.search_runbooks, query, 2),
+        )
 
         chunks: list[str] = []
         if similar:
@@ -340,7 +343,7 @@ async def _build_plan(
     Uses deterministic templates for known issue types and falls back
     to the configured LLM for anything novel.
     """
-    past_context, used_rag = _similar_remediation_context(issue_type, root_cause)
+    past_context, used_rag = await _similar_remediation_context(issue_type, root_cause)
 
     if issue_type == "disk_full":
         steps, artifacts, summary = _disk_cleanup_plan(service_name, metrics)

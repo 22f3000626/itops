@@ -8,6 +8,8 @@ stored incidents/runbooks so incidents can be explained without waiting
 for another model call.
 """
 
+import asyncio
+
 from app.memory.vector_store import get_memory
 
 ISSUE_PROFILES = {
@@ -183,10 +185,12 @@ def _extract_reason_lines(anomaly_data: dict, prediction_data: dict, metrics: di
     return reasons[:5]
 
 
-def _similar_context(query: str) -> tuple[str, bool]:
+async def _similar_context(query: str) -> tuple[str, bool]:
     memory = get_memory()
-    similar = memory.search_similar_incidents(query, n_results=3)
-    runbooks = memory.search_runbooks(query, n_results=2)
+    similar, runbooks = await asyncio.gather(
+        asyncio.to_thread(memory.search_similar_incidents, query, 3),
+        asyncio.to_thread(memory.search_runbooks, query, 2),
+    )
 
     chunks: list[str] = []
     if similar:
@@ -221,7 +225,7 @@ async def diagnose(
         f"{anomaly_type} on {metrics.get('node_type', 'server')} "
         f"- {anomaly_data.get('description', '')}"
     )
-    past_context, used_rag = _similar_context(query)
+    past_context, used_rag = await _similar_context(query)
     reasons = _extract_reason_lines(anomaly_data, prediction_data, metrics)
 
     # ── Deterministic path (known profiles) ──────────────────────
