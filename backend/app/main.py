@@ -10,7 +10,6 @@ remediation with human-in-the-loop approval.
 import asyncio
 import datetime
 import logging
-import random
 import re
 import time
 from contextlib import asynccontextmanager
@@ -21,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database.session import init_db, SessionLocal
 from app.api.routes import infrastructure, incidents, agents, ws, datasources, simulators, settings as settings_routes
 from app.services.infra_service import InfraService
+from app.services.simulator_service import apply_metric_variance
 from app.agents.orchestrator import run_pipeline
 from app.agents.monitoring import preliminary_monitoring_check
 from app.data_sources.simulator import SimulatorDataSource
@@ -49,21 +49,9 @@ SIMULATOR_LOG_LEVEL_PATTERNS = (
 )
 
 
-def _metrics_from_config(config: dict) -> dict:
-    """Apply ±5 % random variance to a simulator metrics config."""
-    result = {}
-    for key, value in config.items():
-        if isinstance(value, (int, float)) and value > 0:
-            spread = value * 0.05
-            result[key] = round(max(0.0, value + random.uniform(-spread, spread)), 2)
-        else:
-            result[key] = value
-    return result
-
-
 def _event_from_sim(sim_row) -> MetricEvent:
     """Build a MetricEvent from a running user-created simulator with metrics."""
-    cfg = _metrics_from_config(sim_row.metrics_config or {})
+    cfg = apply_metric_variance(sim_row.metrics_config or {})
     from app.services.simulator_service import SIMULATOR_TO_NODE_TYPE
     node_type = SIMULATOR_TO_NODE_TYPE.get(sim_row.simulator_type, "server")
     return MetricEvent(

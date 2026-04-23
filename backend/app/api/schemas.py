@@ -62,12 +62,6 @@ class IncidentOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class IncidentApproval(BaseModel):
-    decision: str = Field(..., pattern="^(approved|rejected)$")
-    approved_by: str = "operator"
-    reason: str | None = None
-
-
 # ── Remediation ─────────────────────────────────────────────────────
 
 class RemediationOut(BaseModel):

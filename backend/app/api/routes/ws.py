@@ -8,7 +8,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.database.session import SessionLocal
 from app.database.models import SimulatorStatus
-from app.services.simulator_service import SimulatorService
+from app.services.simulator_service import SimulatorService, apply_metric_variance
 
 
 def _now_iso() -> str:
@@ -83,17 +83,6 @@ async def websocket_metrics(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-def _apply_variance(config: dict) -> dict:
-    """Add ±5% random variance to metric values for realism."""
-    import random
-    result = {}
-    for key, value in config.items():
-        if isinstance(value, (int, float)) and value > 0:
-            spread = value * 0.05
-            result[key] = round(max(0.0, value + random.uniform(-spread, spread)), 2)
-        else:
-            result[key] = value
-    return result
 
 
 @router.websocket("/ws/simulator-logs/{simulator_id}")
@@ -164,7 +153,7 @@ async def websocket_simulator_logs(websocket: WebSocket, simulator_id: int):
             ):
                 await websocket.send_json({
                     "type": "metric_event",
-                    "metrics": _apply_variance(sim.metrics_config),
+                    "metrics": apply_metric_variance(sim.metrics_config),
                     "timestamp": _now_iso(),
                 })
 

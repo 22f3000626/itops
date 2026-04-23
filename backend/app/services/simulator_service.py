@@ -7,6 +7,18 @@ from sqlalchemy.orm import Session
 
 from app.database.models import Simulator, SimulatorStatus, SimulatorType, InfrastructureNode
 
+
+def apply_metric_variance(config: dict, spread_ratio: float = 0.05) -> dict:
+    """Return a copy of a metric config with ±spread_ratio random variance on numeric values."""
+    result = {}
+    for key, value in (config or {}).items():
+        if isinstance(value, (int, float)) and value > 0:
+            spread = value * spread_ratio
+            result[key] = round(max(0.0, value + random.uniform(-spread, spread)), 2)
+        else:
+            result[key] = value
+    return result
+
 logger = logging.getLogger("itops.simulator_service")
 
 # Maps user-creatable simulator types to infrastructure node types
