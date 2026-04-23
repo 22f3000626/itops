@@ -4,6 +4,7 @@ __pycache__/
 .env
 itops.db*
 chroma_db/
+runtime_settings.json
 *.egg-info/
 dist/
 build/

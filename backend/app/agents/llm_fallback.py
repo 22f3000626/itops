@@ -14,77 +14,19 @@ back to the generic deterministic output.
 import asyncio
 import json
 import logging
-import re
 
-import ollama
-
-from app.services.settings_service import settings as _settings
+from app.llm.provider import chat_json as _provider_chat_json
 
 logger = logging.getLogger("itops.llm_fallback")
 
-# Matches the JSON object inside a ```json ... ``` or ``` ... ``` fence.
-_FENCED_JSON = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)
-
-
-def _model() -> str:
-    return _settings.ollama_model or "gemma3:4b"
-
-
-def _parse_json(text: str) -> dict | None:
-    """Parse LLM output that is supposed to be JSON, tolerant of small-model quirks.
-
-    Strategy: try the raw text, then look inside a markdown code fence, then
-    fall back to the first balanced {...} block.
-    """
-    if not text:
-        return None
-
-    text = text.strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-
-    fence_match = _FENCED_JSON.search(text)
-    if fence_match:
-        try:
-            return json.loads(fence_match.group(1))
-        except json.JSONDecodeError:
-            pass
-
-    first = text.find("{")
-    last = text.rfind("}")
-    if first != -1 and last != -1 and last > first:
-        try:
-            return json.loads(text[first : last + 1])
-        except json.JSONDecodeError:
-            pass
-
-    return None
-
-
-def _sync_call_llm(prompt: str, *, temperature: float = 0.1) -> dict | None:
-    """Blocking Ollama call. Do not invoke directly from async code."""
-    try:
-        response = ollama.chat(
-            model=_model(),
-            messages=[{"role": "user", "content": prompt}],
-            format="json",
-            options={"temperature": temperature},
-        )
-        text = response.get("message", {}).get("content", "")
-        parsed = _parse_json(text)
-        if parsed is None:
-            logger.warning("LLM returned non-JSON response (first 200 chars): %s", text[:200])
-        return parsed
-    except Exception as exc:
-        logger.warning("LLM call failed (Ollama may be offline): %s", exc)
-        return None
-
 
 async def _call_llm(prompt: str, *, temperature: float = 0.1) -> dict | None:
-    """Async wrapper that runs the blocking Ollama call off the event loop."""
-    return await asyncio.to_thread(_sync_call_llm, prompt, temperature=temperature)
+    """Route the prompt through the currently selected LLM provider.
+
+    Runs the blocking SDK call in a worker thread so the event loop is
+    never stalled by network I/O.
+    """
+    return await asyncio.to_thread(_provider_chat_json, prompt, temperature=temperature)
 
 
 # ── Diagnostic fallback ─────────────────────────────────────────────

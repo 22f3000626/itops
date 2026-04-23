@@ -15,7 +15,11 @@ langchain==0.3.14
 langchain-ollama==0.2.2
 langchain-core==0.3.29
 langgraph==0.2.60
-ollama==0.4.4
+ollama>=0.5.0
+
+# Cloud LLM providers (optional — only used if selected in Settings)
+openai>=1.40.0
+google-genai>=0.3.0
 
 # Vector DB (lightweight, no C++ build tools needed)
 numpy>=1.26.0
