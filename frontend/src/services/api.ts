@@ -94,6 +94,17 @@ export const getSettings = () => request<any>('/settings/');
 export const updateSettings = (body: any) =>
   request<any>('/settings/', { method: 'PUT', body: JSON.stringify(body) });
 export const getOllamaModels = () => request<any>('/settings/ollama-models');
+export const testLlmProvider = (body: {
+  provider: 'ollama' | 'openai' | 'gemini';
+  model?: string;
+  api_key?: string;
+  base_url?: string;
+}) =>
+  requestWithTimeout<{ ok: boolean; message: string; model?: string }>(
+    '/settings/test-provider',
+    30000,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
 
 export const createSimulator = async (formData: FormData): Promise<any> => {
   const res = await fetch(`${BASE}/simulators/`, {
