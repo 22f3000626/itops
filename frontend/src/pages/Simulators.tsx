@@ -351,15 +351,38 @@ function MetricsEditModal({ simulator, onClose, onSaved }: { simulator: Simulato
 }
 
 /* ── LogViewerModal ───────────────────────────────────────────── */
+const LEVEL_COLORS: Record<string, string> = {
+  CRITICAL: 'text-rose-400',
+  ERROR:    'text-red-400',
+  WARN:     'text-amber-300',
+  WARNING:  'text-amber-300',
+  INFO:     'text-emerald-300',
+  DEBUG:    'text-sky-300',
+};
+
 function LogViewerModal({ simulator, onClose }: { simulator: Simulator; onClose: () => void }) {
-  const { logs, wsStatus, currentLine, totalLines, liveMetrics, connected, clearLogs, reconnect } =
+  const { logs, wsStatus, currentLine, totalLines, liveMetrics, connected, clearLogs, reconnect, isMetricsStream } =
     useSimulatorLogs(simulator.id);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [autoScroll, setAutoScroll] = useState(true);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [logs]);
+  // Only auto-scroll while user is pinned near the bottom — gives them
+  // room to scroll up and inspect history without it jumping back.
+  useEffect(() => {
+    if (autoScroll) bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [logs, autoScroll]);
 
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    setAutoScroll(nearBottom);
+  };
+
+  const isMetrics = simulator.simulator_type === 'metrics' || isMetricsStream;
   const progress = totalLines > 0 ? (currentLine / totalLines) * 100 : 0;
-  const hasMetrics = simulator.metrics_enabled && liveMetrics;
+  const hasMetricsPanel = !isMetrics && simulator.metrics_enabled && liveMetrics;
 
   return (
     <Portal>
@@ -371,7 +394,7 @@ function LogViewerModal({ simulator, onClose }: { simulator: Simulator; onClose:
       <motion.div
         initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
         onClick={(e) => e.stopPropagation()}
-        className="glass-modal w-full max-w-5xl flex flex-col"
+        className="glass-modal w-full max-w-5xl flex flex-col overflow-hidden"
         style={{ height: '76vh' }}
       >
         {/* Header */}
@@ -385,38 +408,55 @@ function LogViewerModal({ simulator, onClose }: { simulator: Simulator; onClose:
           </span>
           {!connected && <button onClick={reconnect} className="text-xs text-accent hover:underline">Reconnect</button>}
           <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs text-slate-400 tabular-nums">{currentLine} / {totalLines} lines</span>
+            {isMetrics ? (
+              <span className="text-xs text-slate-400 tabular-nums">
+                {logs.length} {logs.length === 1 ? 'line' : 'lines'} streamed
+              </span>
+            ) : (
+              <span className="text-xs text-slate-400 tabular-nums">{currentLine} / {totalLines} lines</span>
+            )}
             <button onClick={clearLogs} className="px-2.5 py-1 bg-black/5 hover:bg-black/10 text-slate-500 text-xs rounded-lg transition-colors">Clear</button>
             <button onClick={onClose} className="p-1.5 hover:bg-black/8 rounded-lg transition-colors"><X size={15} className="text-slate-400" /></button>
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div className="h-0.5 bg-slate-100 shrink-0">
-          <motion.div className="h-full bg-accent" animate={{ width: `${progress}%` }} transition={{ duration: 0.3 }} />
-        </div>
+        {/* Progress bar — only meaningful for log-file playback */}
+        {!isMetrics && (
+          <div className="h-0.5 bg-slate-100 shrink-0">
+            <motion.div className="h-full bg-accent" animate={{ width: `${progress}%` }} transition={{ duration: 0.3 }} />
+          </div>
+        )}
 
         <div className="flex flex-1 overflow-hidden">
           {/* Log terminal */}
-          <div className="flex-1 overflow-auto bg-slate-950 font-mono text-xs p-4">
+          <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto bg-slate-950 font-mono text-xs p-4">
             {logs.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-slate-600 gap-2">
                 <Terminal size={28} className="opacity-40" />
-                <p>No logs yet. Start the simulator to begin streaming.</p>
+                <p>
+                  {isMetrics
+                    ? 'Waiting for the next simulated tick…'
+                    : 'No logs yet. Start the simulator to begin streaming.'}
+                </p>
               </div>
             ) : (
-              logs.map((line, i) => (
-                <div key={i} className="flex gap-3 py-0.5 hover:bg-white/5 px-1 rounded leading-5">
-                  <span className="text-slate-600 select-none w-8 text-right shrink-0">{i + 1}</span>
-                  <span className="text-green-400 break-all">{line}</span>
-                </div>
-              ))
+              logs.map((entry, i) => {
+                const colorClass = entry.level
+                  ? LEVEL_COLORS[entry.level.toUpperCase()] ?? 'text-green-400'
+                  : 'text-green-400';
+                return (
+                  <div key={i} className="flex gap-3 py-0.5 hover:bg-white/5 px-1 rounded leading-5">
+                    <span className="text-slate-600 select-none w-10 text-right shrink-0 tabular-nums">{i + 1}</span>
+                    <span className={`${colorClass} break-all whitespace-pre-wrap`}>{entry.line}</span>
+                  </div>
+                );
+              })
             )}
             <div ref={bottomRef} />
           </div>
 
-          {/* Live metrics panel */}
-          {hasMetrics && (
+          {/* Live metrics panel — log-file simulators only */}
+          {hasMetricsPanel && liveMetrics && (
             <div className="w-56 shrink-0 border-l border-slate-200/30 bg-slate-900/60 p-4 space-y-3 overflow-auto">
               <div className="flex items-center gap-1.5 mb-2">
                 <Activity size={12} className="text-accent" />
@@ -474,7 +514,22 @@ function SimulatorCard({
             <p className="text-xs text-slate-400">{meta.label}</p>
           </div>
         </div>
-        <StatusBadge status={sim.status} pulse={sim.status === 'running'} />
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => onViewLogs(sim)}
+            title="Open live log terminal"
+            className="group relative p-1.5 rounded-lg bg-slate-900/85 hover:bg-slate-900 text-emerald-300 hover:text-emerald-200 ring-1 ring-slate-700/60 hover:ring-emerald-400/40 transition-all shadow-sm"
+          >
+            <Terminal size={13} />
+            {sim.status === 'running' && (
+              <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+              </span>
+            )}
+          </button>
+          <StatusBadge status={sim.status} pulse={sim.status === 'running'} />
+        </div>
       </div>
 
       {/* Log progress — only for vm/db types */}

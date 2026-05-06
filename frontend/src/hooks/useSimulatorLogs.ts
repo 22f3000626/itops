@@ -1,13 +1,22 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { SimulatorLogEvent, SimulatorMetrics } from '../types';
 
+export interface SimulatorLogLine {
+  line: string;
+  level?: string;
+  source?: string;
+}
+
+const MAX_BUFFERED_LINES = 500;
+
 export function useSimulatorLogs(simulatorId: number | null) {
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logs, setLogs] = useState<SimulatorLogLine[]>([]);
   const [wsStatus, setWsStatus] = useState<string>('stopped');
   const [currentLine, setCurrentLine] = useState(0);
   const [totalLines, setTotalLines] = useState(0);
   const [liveMetrics, setLiveMetrics] = useState<SimulatorMetrics | null>(null);
   const [connected, setConnected] = useState(false);
+  const [isMetricsStream, setIsMetricsStream] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
   const connect = useCallback(() => {
@@ -26,13 +35,20 @@ export function useSimulatorLogs(simulatorId: number | null) {
         const msg: SimulatorLogEvent = JSON.parse(e.data);
 
         if (msg.type === 'log_line' && msg.line != null) {
-          setLogs((prev) => [...prev, msg.line!]);
-          setCurrentLine(msg.line_number ?? 0);
-          setTotalLines(msg.total_lines ?? 0);
+          setLogs((prev) => {
+            const next = [...prev, { line: msg.line!, level: msg.level, source: msg.source }];
+            // Cap buffer so a long-running fleet stream doesn't OOM the tab.
+            return next.length > MAX_BUFFERED_LINES
+              ? next.slice(next.length - MAX_BUFFERED_LINES)
+              : next;
+          });
+          if (msg.line_number != null) setCurrentLine(msg.line_number);
+          if (msg.total_lines != null) setTotalLines(msg.total_lines);
         } else if (msg.type === 'status') {
           setWsStatus(msg.status ?? 'stopped');
           if (msg.current_line != null) setCurrentLine(msg.current_line);
           if (msg.total_lines != null) setTotalLines(msg.total_lines);
+          if (msg.is_metrics != null) setIsMetricsStream(msg.is_metrics);
         } else if (msg.type === 'metric_event' && msg.metrics) {
           setLiveMetrics(msg.metrics);
         }
@@ -68,5 +84,15 @@ export function useSimulatorLogs(simulatorId: number | null) {
     };
   }, [simulatorId, connect, disconnect]);
 
-  return { logs, wsStatus, currentLine, totalLines, liveMetrics, connected, clearLogs, reconnect: connect };
+  return {
+    logs,
+    wsStatus,
+    currentLine,
+    totalLines,
+    liveMetrics,
+    connected,
+    clearLogs,
+    reconnect: connect,
+    isMetricsStream,
+  };
 }

@@ -267,4 +267,7 @@ export interface SimulatorLogEvent {
   timestamp?: string;
   current_line?: number;
   metrics?: SimulatorMetrics;
+  level?: string;
+  source?: string;
+  is_metrics?: boolean;
 }

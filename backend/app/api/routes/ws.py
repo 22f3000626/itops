@@ -6,9 +6,15 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.database.session import SessionLocal
-from app.database.models import SimulatorStatus
+from app.database.models import SimulatorStatus, SimulatorType, InfrastructureNode, LogEntry
 from app.services.simulator_service import SimulatorService, apply_metric_variance
 from app.config import utc_now
+
+
+def _format_db_log_line(entry: LogEntry) -> str:
+    """Render a stored LogEntry as a single terminal-style line."""
+    ts = entry.timestamp.isoformat() if entry.timestamp else "N/A"
+    return f"[{ts}] {entry.level:<8} ({entry.source}) {entry.message}"
 
 
 def _now_iso() -> str:
@@ -109,8 +115,7 @@ async def websocket_simulator_logs(websocket: WebSocket, simulator_id: int):
             await websocket.close()
             return
 
-        # Track how many lines we've already sent to this client
-        last_sent_index = 0
+        is_metrics = sim.simulator_type == SimulatorType.METRICS
 
         # Send initial status
         await websocket.send_json({
@@ -118,7 +123,85 @@ async def websocket_simulator_logs(websocket: WebSocket, simulator_id: int):
             "status": sim.status.value,
             "current_line": sim.current_line_index,
             "total_lines": sim.total_lines,
+            "is_metrics": is_metrics,
         })
+
+        # ── Fleet-metrics simulators: stream live DB-backed log entries ──
+        # The background monitoring loop writes realistic LogEntry rows
+        # for the matching InfrastructureNode each tick (see
+        # SimulatorDataSource.generate_logs_for_event). We tail those.
+        if is_metrics:
+            node = (
+                db.query(InfrastructureNode)
+                .filter(InfrastructureNode.node_name == sim.name)
+                .first()
+            )
+            last_log_id = 0
+
+            # Send a small backlog so the terminal isn't empty on open
+            if node is not None:
+                backlog = (
+                    db.query(LogEntry)
+                    .filter(LogEntry.node_id == node.id)
+                    .order_by(LogEntry.id.desc())
+                    .limit(40)
+                    .all()
+                )
+                for entry in reversed(backlog):
+                    await websocket.send_json({
+                        "type": "log_line",
+                        "line": _format_db_log_line(entry),
+                        "level": entry.level,
+                        "source": entry.source,
+                        "timestamp": entry.timestamp.isoformat() if entry.timestamp else _now_iso(),
+                    })
+                    if entry.id > last_log_id:
+                        last_log_id = entry.id
+
+            while True:
+                # Force a fresh transaction snapshot so we see rows that
+                # the background loop has committed in another session.
+                db.expire_all()
+                db.refresh(sim)
+
+                if node is None:
+                    node = (
+                        db.query(InfrastructureNode)
+                        .filter(InfrastructureNode.node_name == sim.name)
+                        .first()
+                    )
+
+                if node is not None:
+                    new_logs = (
+                        db.query(LogEntry)
+                        .filter(LogEntry.node_id == node.id, LogEntry.id > last_log_id)
+                        .order_by(LogEntry.id.asc())
+                        .limit(50)
+                        .all()
+                    )
+                    for entry in new_logs:
+                        await websocket.send_json({
+                            "type": "log_line",
+                            "line": _format_db_log_line(entry),
+                            "level": entry.level,
+                            "source": entry.source,
+                            "timestamp": entry.timestamp.isoformat() if entry.timestamp else _now_iso(),
+                        })
+                        if entry.id > last_log_id:
+                            last_log_id = entry.id
+
+                await websocket.send_json({
+                    "type": "status",
+                    "status": sim.status.value,
+                    "current_line": 0,
+                    "total_lines": 0,
+                    "is_metrics": True,
+                })
+
+                await asyncio.sleep(1)
+
+        # ── Log-file playback simulators (vm/db/cache/lb/queue) ──
+        last_sent_index = 0
 
         while True:
             db.refresh(sim)
@@ -143,6 +226,7 @@ async def websocket_simulator_logs(websocket: WebSocket, simulator_id: int):
                 "status": sim.status.value,
                 "current_line": current_idx,
                 "total_lines": sim.total_lines,
+                "is_metrics": False,
             })
 
             # Metrics pulse when enabled and running
