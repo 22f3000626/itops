@@ -43,7 +43,6 @@ export const getIncidents = (status?: string) =>
   request<any[]>(`/incidents/${status ? `?status=${status}` : ''}`);
 export const getIncident = (id: number) => request<any>(`/incidents/${id}`);
 export const getIncidentRemediation = (id: number) => request<any>(`/incidents/${id}/remediation`);
-export const getIncidentLogs = (id: number) => request<any[]>(`/incidents/${id}/logs`);
 export const getIncidentRemediationArtifactDownloadUrl = (id: number, artifactId: string) =>
   `${BASE}/incidents/${id}/remediation/artifacts/${encodeURIComponent(artifactId)}`;
 

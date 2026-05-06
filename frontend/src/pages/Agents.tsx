@@ -26,37 +26,32 @@ const AGENT_GLOW: Record<string, string> = {
 
 const PIPELINE_STEPS = ['monitoring', 'predictive', 'diagnostic', 'remediation', 'reporting'];
 
-const AGENT_DETAILS: Record<string, { title: string, role: string, overview: string, highlights: string[] }> = {
+const AGENT_DETAILS: Record<string, { title: string, role: string, highlights: string[] }> = {
   monitoring: {
     title: 'Monitoring Agent',
-    role: 'Phase 1 • Observation',
-    overview: 'The pipeline begins here. The Monitoring Agent acts as a continuous sentinel, constantly ingesting infrastructure metrics and log streams. By combining statistical baselining with LLM-powered context awareness, it rapidly identifies genuine anomalies while actively suppressing false positives and alert fatigue.',
-    highlights: ['Real-time Log Tailing', 'Anomaly Detection', 'Noise Suppression']
+    role: 'Phase 1 • Detection',
+    highlights: ['Threshold checks', 'Log pattern matching', 'Anomaly classification'],
   },
   predictive: {
     title: 'Predictive Agent',
     role: 'Phase 2 • Forecasting',
-    overview: 'Once an anomaly is detected, the Predictor analyzes its historical trajectory. By projecting current degradation rates (such as memory leaks or disk filling), it precisely calculates the Estimated Time to Failure (TTF), allowing the system to prioritize its intervention urgency.',
-    highlights: ['Trend Analysis', 'TTF Calculation', 'Risk Assessment']
+    highlights: ['Trend extrapolation', 'Time-to-failure', 'Escalation risk'],
   },
   diagnostic: {
     title: 'Diagnostic Agent',
-    role: 'Phase 3 • Root Cause Analysis',
-    overview: 'This is the reasoning engine of the pipeline. Utilizing RAG (Retrieval-Augmented Generation) against a massive database of past incident tickets and institutional runbooks, it deduces the exact underlying cause of the forecasted failure and prepares a human-readable diagnostic hypothesis.',
-    highlights: ['Causal Reasoning', 'RAG Contextualization', 'Hypothesis Generation']
+    role: 'Phase 3 • Root cause',
+    highlights: ['Causal reasoning', 'RAG retrieval', 'Hypothesis generation'],
   },
   remediation: {
     title: 'Remediation Agent',
-    role: 'Phase 4 • Action Synthesis',
-    overview: 'Equipped with a diagnosis, the Remediation Agent autonomously synthesizes code to fix the issue. Whether it requires writing bash scripts, rolling back a deployment, or optimizing database queries, it formulates the exact commands needed—always paired with a safety-first rollback strategy.',
-    highlights: ['Script Synthesis', 'Canary Rollouts', 'Auto-Rollbacks']
+    role: 'Phase 4 • Script generation',
+    highlights: ['Apply script', 'Rollback script', 'Operator review'],
   },
   reporting: {
     title: 'Reporting Agent',
-    role: 'Phase 5 • Post-Mortem',
-    overview: 'The final step of the sequence. After the system is stabilized, the Reporter compiles the entire autonomous intervention into a highly detailed, chronological post-mortem. It automatically archives the resolution as a new runbook paradigm, teaching future agents how to handle the edge case.',
-    highlights: ['Incident Timelines', 'Knowledge Archival', 'Stakeholder Comms']
-  }
+    role: 'Phase 5 • Post-mortem',
+    highlights: ['Executive summary', 'Incident timeline', 'Auto-runbook'],
+  },
 };
 
 export default function Agents() {
@@ -70,13 +65,13 @@ export default function Agents() {
       {/* ── Page Header & Overview ── */}
       <div className="text-center space-y-4 max-w-3xl mx-auto">
         <div className="inline-flex items-center justify-center px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-2">
-          <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-widest whitespace-nowrap">Autonomous AI Architecture</span>
+          <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-widest whitespace-nowrap">Pipeline Architecture</span>
         </div>
         <h1 className="font-display text-[40px] leading-[1.05] text-[var(--color-ink)] tracking-tight">The Orchestrator Sequence</h1>
         <p className="text-base text-slate-500 font-medium leading-relaxed">
-          Five highly-specialized AI agents work in a continuous, deterministic pipeline.
-          From the exact moment an anomaly is detected to the automated deployment of a resolution script,
-          the Orchestrator sequence acts as a fully autonomous Site Reliability Engineer.
+          Five specialized agents run in sequence whenever an anomaly is detected — they detect, predict,
+          diagnose, generate remediation scripts, and post-mortem. Generated scripts are saved as
+          downloadable artifacts for an operator to review before they are applied.
         </p>
       </div>
 
@@ -127,7 +122,7 @@ export default function Agents() {
                     <h2 className="text-2xl font-bold text-slate-800 tracking-tight mb-4">{details.title}</h2>
 
                     <p className="text-sm text-slate-600 font-medium leading-relaxed mb-6">
-                      {details.overview}
+                      {apiAgent?.description ?? 'Loading description from backend…'}
                     </p>
 
                     <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-200/50">

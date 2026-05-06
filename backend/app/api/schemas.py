@@ -140,8 +140,6 @@ class AgentInfo(BaseModel):
     name: str
     description: str
     status: str
-    last_run: str | None = None
-    runs_count: int = 0
 
 
 class AgentLogOut(BaseModel):

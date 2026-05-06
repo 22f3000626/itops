@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion';
 import { useMemo, useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   TrendingUp, Wrench, FileText,
-  Activity, Pause, Play, Zap, Search as SearchIcon, Wifi, WifiOff,
+  Activity, Zap, Search as SearchIcon, Wifi, WifiOff,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -12,7 +13,6 @@ import StatusBadge from '../components/ui/StatusBadge';
 import AnimatedNumber from '../components/ui/AnimatedNumber';
 import Loader from '../components/ui/Loader';
 import MagneticButton from '../components/common/MagneticButton';
-import SegmentedControl from '../components/common/SegmentedControl';
 import { usePolling } from '../hooks/useApi';
 import { useMetricsStream } from '../hooks/useWebSocket';
 import * as api from '../services/api';
@@ -44,15 +44,15 @@ function useChartHistory(events: WsMetricEvent[], maxPoints = 32) {
 }
 
 /* ── editorial donut gauge with springy fill ────────────── */
-function Gauge({ value, label, sub, accent = 'var(--color-accent)' }: {
-  value: number; label: string; sub?: string; accent?: string;
+function Gauge({ value, label, sub, accent = 'var(--color-accent)', hint }: {
+  value: number; label: string; sub?: string; accent?: string; hint?: string;
 }) {
   const pct = Math.max(0, Math.min(100, Math.round(value)));
   const r = 26;
   const c = 2 * Math.PI * r;
   const dash = (pct / 100) * c;
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-4" title={hint}>
       <div className="relative w-[68px] h-[68px] shrink-0">
         <svg viewBox="0 0 64 64" className="w-full h-full -rotate-90">
           <circle cx="32" cy="32" r={r} fill="none" stroke="rgba(21,25,26,0.07)" strokeWidth="3" />
@@ -81,25 +81,17 @@ function Gauge({ value, label, sub, accent = 'var(--color-accent)' }: {
 }
 
 /* ── KPI tile (cascades in via fadeUp) ───────────────────── */
-function Kpi({ label, value, suffix, delta, deltaTone = 'pos' }: {
-  label: string; value: number | string; suffix?: string; delta?: string; deltaTone?: 'pos' | 'neg';
+function Kpi({ label, value, suffix, hint }: {
+  label: string; value: number | string; suffix?: string; hint?: string;
 }) {
   return (
-    <motion.div variants={fadeUp} className="glass-sm p-4 flex flex-col gap-1 gpu">
+    <motion.div variants={fadeUp} className="glass-sm p-4 flex flex-col gap-1 gpu" title={hint}>
       <span className="label-eyebrow !text-[9.5px]">{label}</span>
       <div className="flex items-baseline justify-between mt-1">
         <span className="font-display text-[24px] leading-none numeric text-[var(--color-ink)]">
           {typeof value === 'number' ? <AnimatedNumber value={value} /> : value}
           {suffix && <span className="text-[12px] text-[var(--color-ink-mute)] ml-0.5 font-sans">{suffix}</span>}
         </span>
-        {delta && (
-          <span
-            className="text-[10.5px] numeric font-mono"
-            style={{ color: deltaTone === 'pos' ? '#3d7d65' : '#c5524d' }}
-          >
-            {deltaTone === 'pos' ? '↑' : '↓'} {delta}
-          </span>
-        )}
       </div>
     </motion.div>
   );
@@ -161,14 +153,11 @@ function Sparkline({ data, color = '#244745' }: { data: number[]; color?: string
   );
 }
 
-type StreamMode = 'live' | 'paused';
-
 export default function Dashboard() {
   const { data: stats, loading: statsLoading, error: statsError } = usePolling<DashboardStats>(api.getDashboard, 8000);
   const { data: incidents } = usePolling<Incident[]>(() => api.getIncidents(), 8000);
   const { data: wsEvents, connected } = useMetricsStream();
   const chartData = useChartHistory(wsEvents);
-  const [streamMode, setStreamMode] = useState<StreamMode>('live');
 
   const safeStats: DashboardStats = stats || {
     total_nodes: 0, healthy_nodes: 0, degraded_nodes: 0, critical_nodes: 0,
@@ -197,6 +186,53 @@ export default function Dashboard() {
     return +(wsEvents.reduce((s, e) => s + e.metrics.error_rate, 0) / wsEvents.length).toFixed(1);
   }, [wsEvents]);
 
+  // Regions actually present in the live fleet
+  const regions = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of wsEvents) if (e.region) set.add(e.region);
+    return Array.from(set).sort();
+  }, [wsEvents]);
+
+  // Mean time to resolution, computed from resolved incidents only
+  const mttrMinutes = useMemo(() => {
+    const list = incidents ?? [];
+    const durations: number[] = [];
+    for (const inc of list) {
+      if (!inc.detected_at || !inc.resolved_at) continue;
+      const d = new Date(inc.detected_at).getTime();
+      const r = new Date(inc.resolved_at).getTime();
+      if (Number.isFinite(d) && Number.isFinite(r) && r >= d) {
+        durations.push((r - d) / 60000);
+      }
+    }
+    if (!durations.length) return null;
+    const avg = durations.reduce((s, n) => s + n, 0) / durations.length;
+    return +avg.toFixed(1);
+  }, [incidents]);
+
+  // Headline that reflects real fleet state, not a static slogan
+  const headline = useMemo(() => {
+    if (!wsEvents.length && safeStats.total_nodes === 0) {
+      return { title: 'No nodes connected.', sub: 'Connect a data source or start a simulator to begin.' };
+    }
+    if (safeStats.critical_nodes > 0) {
+      return {
+        title: `${safeStats.critical_nodes} critical node${safeStats.critical_nodes === 1 ? '' : 's'} need attention.`,
+        sub: `${wsEvents.length} streaming · ${safeStats.open_incidents} open incident${safeStats.open_incidents === 1 ? '' : 's'}`,
+      };
+    }
+    if (safeStats.degraded_nodes > 0) {
+      return {
+        title: 'All operational.',
+        sub: `${safeStats.degraded_nodes} degraded · ${wsEvents.length} streaming`,
+      };
+    }
+    return {
+      title: `All ${safeStats.healthy_nodes || wsEvents.length} nodes healthy.`,
+      sub: `${wsEvents.length} streaming live`,
+    };
+  }, [wsEvents.length, safeStats]);
+
   const now = new Date();
   const dateLabel = now.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }).toUpperCase();
   const timeLabel = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
@@ -221,42 +257,38 @@ export default function Dashboard() {
         <div className="flex items-center gap-3 label-eyebrow !text-[10px] flex-wrap">
           <span>Mission Control</span>
           <span className="text-[var(--color-ink-faint)]">—</span>
-          <span>US-EAST-1</span>
-          <span className="text-[var(--color-ink-faint)]">·</span>
-          <span>US-WEST-2</span>
-          <span className="text-[var(--color-ink-faint)]">·</span>
-          <span>EU-WEST-1</span>
-          <span className="text-[var(--color-ink-faint)]">·</span>
-          <span>GLOBAL</span>
+          {regions.length > 0 ? (
+            regions.map((r, i) => (
+              <span key={r} className="flex items-center gap-3">
+                {i > 0 && <span className="text-[var(--color-ink-faint)]">·</span>}
+                <span>{r.toUpperCase()}</span>
+              </span>
+            ))
+          ) : (
+            <span className="text-[var(--color-ink-mute)]">no regions reporting</span>
+          )}
           <span className="text-[var(--color-ink-faint)]">—</span>
           <span>{dateLabel}, {timeLabel}</span>
         </div>
 
         <div className="mt-3 flex items-end justify-between gap-6 flex-wrap">
           <h1 className="font-display text-[40px] leading-[1.05] text-[var(--color-ink)]">
-            All systems autonomous.{' '}
+            {headline.title}{' '}
             <span className="text-[var(--color-ink-mute)] italic">
-              {wsEvents.length} nodes streaming.
+              {headline.sub}
             </span>
           </h1>
 
           <div className="flex items-center gap-2">
-            <MagneticButton variant="ghost">
-              <SearchIcon size={13} /> Find anything
-            </MagneticButton>
-            <SegmentedControl<StreamMode>
-              value={streamMode}
-              onChange={setStreamMode}
-              ariaLabel="Stream mode"
-              options={[
-                { value: 'live',   label: 'Live',   icon: <Play size={11} /> },
-                { value: 'paused', label: 'Paused', icon: <Pause size={11} /> },
-              ]}
-            />
-            <MagneticButton variant="solid">
-              <Zap size={13} /> Run pipeline
-            </MagneticButton>
-            <span className="ml-2 flex items-center gap-1.5">
+            <Link to="/pipeline" title="Open the Pipeline page to run agents on a node">
+              <MagneticButton variant="solid">
+                <Zap size={13} /> Run pipeline
+              </MagneticButton>
+            </Link>
+            <span
+              className="ml-2 flex items-center gap-1.5"
+              title={connected ? 'Receiving live metrics from the backend' : 'Not receiving live metrics — backend may be down'}
+            >
               {connected
                 ? <Wifi size={12} className="text-[var(--color-success)]" />
                 : <WifiOff size={12} className="text-[var(--color-critical)]" />}
@@ -275,16 +307,55 @@ export default function Dashboard() {
           className="grid grid-cols-1 md:grid-cols-8 gap-5 items-center"
         >
           <div className="md:col-span-3 flex items-center gap-6 flex-wrap">
-            <Gauge value={cpuAvg} label="CPU AVG" sub={`${wsEvents.length} nodes`} />
-            <Gauge value={memAvg} label="MEMORY" sub="rolling 60s" accent="#3a6f6a" />
-            <Gauge value={Math.min(99, latP50)} label="LATENCY" sub={`${latP50}ms p50`} accent="#c08a3e" />
+            <Gauge
+              value={cpuAvg}
+              label="CPU AVG"
+              sub={wsEvents.length ? `across ${wsEvents.length} node${wsEvents.length === 1 ? '' : 's'}` : 'no data'}
+              hint="Average CPU usage across all live-streaming nodes right now"
+            />
+            <Gauge
+              value={memAvg}
+              label="MEMORY"
+              sub={wsEvents.length ? 'live average' : 'no data'}
+              accent="#3a6f6a"
+              hint="Average memory usage across all live-streaming nodes right now"
+            />
+            <Gauge
+              value={Math.min(99, latP50)}
+              label="LATENCY"
+              sub={wsEvents.length ? `${latP50}ms p50` : 'no data'}
+              accent="#c08a3e"
+              hint="Median (p50) request latency across the fleet — half of requests are faster than this number"
+            />
           </div>
           <div className="md:col-span-5 grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <Kpi label="Healthy"       value={safeStats.healthy_nodes}  delta="2%"  deltaTone="pos" />
-            <Kpi label="Degraded"      value={safeStats.degraded_nodes} delta="1%"  deltaTone="neg" />
-            <Kpi label="Critical"      value={safeStats.critical_nodes} delta="1%"  deltaTone="pos" />
-            <Kpi label="MTTR"          value={4.2}                      suffix="min" delta="18%" deltaTone="neg" />
-            <Kpi label="Auto-fix Rate" value={Math.round(safeStats.success_rate)} suffix="%" delta="3%" deltaTone="pos" />
+            <Kpi
+              label="Healthy"
+              value={safeStats.healthy_nodes}
+              hint="Nodes operating normally with no detected anomalies"
+            />
+            <Kpi
+              label="Degraded"
+              value={safeStats.degraded_nodes}
+              hint="Nodes showing performance issues but still serving requests"
+            />
+            <Kpi
+              label="Critical"
+              value={safeStats.critical_nodes}
+              hint="Nodes with severe issues that need immediate attention"
+            />
+            <Kpi
+              label="MTTR"
+              value={mttrMinutes != null ? mttrMinutes : '—'}
+              suffix={mttrMinutes != null ? 'min' : undefined}
+              hint="Mean Time To Resolution — average minutes from incident detection to resolution, across all resolved incidents"
+            />
+            <Kpi
+              label="Auto-fix Rate"
+              value={safeStats.total_remediations > 0 ? Math.round(safeStats.success_rate) : '—'}
+              suffix={safeStats.total_remediations > 0 ? '%' : undefined}
+              hint="Percentage of remediation runs that succeeded automatically without human intervention"
+            />
           </div>
         </motion.div>
       </motion.div>
@@ -294,7 +365,12 @@ export default function Dashboard() {
         <GlassCard hover={false} tilt className="lg:col-span-3 !p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <h2 className="font-display text-[18px] text-[var(--color-ink)]">Autonomous pipeline</h2>
+              <h2
+                className="font-display text-[18px] text-[var(--color-ink)]"
+                title="Five specialized AI agents that run in sequence whenever an anomaly is detected"
+              >
+                Autonomous pipeline
+              </h2>
               <span
                 className="text-[10.5px] font-mono px-2 py-0.5 rounded-full"
                 style={{
@@ -302,11 +378,19 @@ export default function Dashboard() {
                   color: 'var(--color-accent)',
                   border: '1px solid rgba(36,71,69,0.18)',
                 }}
+                title="Total remediation actions executed by the agents so far"
               >
-                Run #{2841 + (incidents?.length ?? 0)} · worker-01
+                {safeStats.total_remediations.toLocaleString()} remediation{safeStats.total_remediations === 1 ? '' : 's'} executed
               </span>
             </div>
-            <span className="label-eyebrow !text-[9.5px]">idle · listening</span>
+            <span
+              className="label-eyebrow !text-[9.5px]"
+              title="Current agent activity"
+            >
+              {safeStats.open_incidents > 0
+                ? `${safeStats.open_incidents} active incident${safeStats.open_incidents === 1 ? '' : 's'}`
+                : 'idle · monitoring'}
+            </span>
           </div>
 
           <div className="relative">
@@ -323,28 +407,40 @@ export default function Dashboard() {
 
           <div className="mt-6 pt-4 hairline" />
           <div className="flex items-center justify-center gap-6 mt-3 label-eyebrow !text-[9.5px]">
-            <span>Vector · {safeStats.memory_incidents_stored.toLocaleString()} incidents</span>
+            <span title="Past incidents stored in the vector database, used by agents as RAG context">
+              Memory · {safeStats.memory_incidents_stored.toLocaleString()} past incident{safeStats.memory_incidents_stored === 1 ? '' : 's'}
+            </span>
             <span className="text-[var(--color-ink-faint)]">·</span>
-            <span>{safeStats.memory_runbooks_stored.toLocaleString()} runbooks</span>
+            <span title="Auto-generated runbooks built from resolved incidents">
+              {safeStats.memory_runbooks_stored.toLocaleString()} runbook{safeStats.memory_runbooks_stored === 1 ? '' : 's'}
+            </span>
           </div>
         </GlassCard>
 
         <GlassCard hover={false} className="lg:col-span-2 !p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-[18px] text-[var(--color-ink)]">Telemetry</h2>
-            <span className="label-eyebrow !text-[9.5px]">
-              60s window · {wsEvents.length} samples
+            <h2
+              className="font-display text-[18px] text-[var(--color-ink)]"
+              title="Live performance metrics streamed from your nodes"
+            >
+              Telemetry
+            </h2>
+            <span
+              className="label-eyebrow !text-[9.5px]"
+              title="Each sample is one metric snapshot from one node — totaled across the live fleet"
+            >
+              {wsEvents.length} live sample{wsEvents.length === 1 ? '' : 's'}
             </span>
           </div>
 
           <motion.div variants={stagger(0.05)} className="grid grid-cols-2 gap-3">
             {[
-              { key: 'cpu' as const, label: 'CPU avg',     val: `${cpuAvg.toFixed(1)}%`,    color: '#244745' },
-              { key: 'mem' as const, label: 'Memory avg',  val: `${memAvg.toFixed(1)}%`,    color: '#3a6f6a' },
-              { key: 'err' as const, label: 'Error rate',  val: `${errAvg}%`,                color: '#c08a3e' },
-              { key: 'lat' as const, label: 'Latency p50', val: `${latP50}ms`,              color: '#15191a' },
+              { key: 'cpu' as const, label: 'CPU avg',     val: `${cpuAvg.toFixed(1)}%`,    color: '#244745', hint: 'Average CPU utilization across the live fleet' },
+              { key: 'mem' as const, label: 'Memory avg',  val: `${memAvg.toFixed(1)}%`,    color: '#3a6f6a', hint: 'Average memory utilization across the live fleet' },
+              { key: 'err' as const, label: 'Error rate',  val: `${errAvg}%`,                color: '#c08a3e', hint: 'Average percentage of requests returning errors' },
+              { key: 'lat' as const, label: 'Latency p50', val: `${latP50}ms`,              color: '#15191a', hint: 'Median request latency — half of requests are faster than this' },
             ].map(ch => (
-              <motion.div key={ch.key} variants={fadeUp} className="glass-sm !rounded-xl p-3 gpu">
+              <motion.div key={ch.key} variants={fadeUp} className="glass-sm !rounded-xl p-3 gpu" title={ch.hint}>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="label-eyebrow !text-[9px]">{ch.label}</span>
                   <span className="text-[12px] font-mono numeric text-[var(--color-ink)]">{ch.val}</span>
@@ -391,21 +487,27 @@ export default function Dashboard() {
         <GlassCard hover={false} className="lg:col-span-3 !p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <h2 className="font-display text-[18px] text-[var(--color-ink)]">Fleet</h2>
+              <h2
+                className="font-display text-[18px] text-[var(--color-ink)]"
+                title="Nodes currently streaming live metrics — each row is one server, database, or service"
+              >
+                Fleet
+              </h2>
               <span className="label-eyebrow !text-[9.5px]">
-                {wsEvents.length} nodes · 4 regions
+                {wsEvents.length} node{wsEvents.length === 1 ? '' : 's'}
+                {regions.length > 0 && ` · ${regions.length} region${regions.length === 1 ? '' : 's'}`}
               </span>
             </div>
             <div className="flex items-center gap-3 text-[10.5px] font-mono">
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1" title="Healthy nodes">
                 <span className="status-dot" style={{ background: '#3d7d65' }} />
                 {safeStats.healthy_nodes}
               </span>
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1" title="Degraded nodes">
                 <span className="status-dot" style={{ background: '#c08a3e' }} />
                 {safeStats.degraded_nodes}
               </span>
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1" title="Critical nodes">
                 <span className="status-dot" style={{ background: '#c5524d' }} />
                 {safeStats.critical_nodes}
               </span>
@@ -447,8 +549,8 @@ export default function Dashboard() {
                           <span className="font-mono text-[var(--color-ink)]">{ev.node_name}</span>
                         </span>
                       </td>
-                      <td className="px-2 py-2.5 font-mono text-[var(--color-ink-mute)]">{ev.node_type ?? 'EC2'}</td>
-                      <td className="px-2 py-2.5 font-mono text-[var(--color-ink-mute)]">{ev.region ?? 'us-east-1'}</td>
+                      <td className="px-2 py-2.5 font-mono text-[var(--color-ink-mute)]">{ev.node_type || '—'}</td>
+                      <td className="px-2 py-2.5 font-mono text-[var(--color-ink-mute)]">{ev.region || '—'}</td>
                       <td className="px-2 py-2.5 text-right numeric font-mono">{ev.metrics.cpu_percent}%</td>
                       <td className="px-2 py-2.5 text-right numeric font-mono">{ev.metrics.memory_percent}%</td>
                       <td className="px-2 py-2.5 text-right numeric font-mono">{ev.metrics.error_rate.toFixed(2)}%</td>
@@ -476,8 +578,18 @@ export default function Dashboard() {
         <GlassCard hover={false} className="lg:col-span-2 !p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <h2 className="font-display text-[18px] text-[var(--color-ink)]">Incidents</h2>
-              <span className="label-eyebrow !text-[9.5px]">last 4h</span>
+              <h2
+                className="font-display text-[18px] text-[var(--color-ink)]"
+                title="Issues detected by the agents — click an entry on the Incidents page for full details"
+              >
+                Incidents
+              </h2>
+              <span
+                className="label-eyebrow !text-[9.5px]"
+                title="The 8 most recent incidents — see the Incidents page for the full history"
+              >
+                {recentIncidents.length > 0 ? 'most recent' : 'no incidents yet'}
+              </span>
             </div>
             <span
               className="text-[10.5px] font-mono px-2 py-0.5 rounded-full"
@@ -486,8 +598,9 @@ export default function Dashboard() {
                 color: '#923a36',
                 border: '1px solid rgba(197,82,77,0.20)',
               }}
+              title="Incidents that have not yet been resolved"
             >
-              ● {safeStats.open_incidents} active
+              ● {safeStats.open_incidents} open
             </span>
           </div>
 

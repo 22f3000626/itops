@@ -270,11 +270,7 @@ export default function Pipeline() {
     setRunId(null);
     setElapsedMs(0);
     startTimeRef.current = Date.now();
-    setLogs([
-      { timestamp: 0, message: 'Pipeline started for ALL nodes', type: 'info' },
-      { timestamp: 0, message: 'Pipeline request sent to backend', type: 'agent' },
-      { timestamp: 0, message: 'Detailed agent timings will appear after completion', type: 'info' },
-    ]);
+    setLogs([]);
     try {
       const res = await api.runPipelineAll();
       const elapsed = Date.now() - startTimeRef.current;

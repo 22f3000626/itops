@@ -48,8 +48,6 @@ export interface AgentInfo {
   name: string;
   description: string;
   status: string;
-  last_run: string | null;
-  runs_count: number;
 }
 
 export interface AgentLog {
@@ -174,6 +172,16 @@ export interface RunbookEntry {
   source_incident_id: number | null;
   effectiveness_score: number;
   times_used: number;
+  issue_type: string | null;
+  root_cause: string | null;
+  causal_chain: string[] | null;
+  blast_radius: string[] | null;
+  blast_radius_severity: string | null;
+  recommended_actions: Record<string, unknown>[] | null;
+  remediation_summary: string | null;
+  remediation_steps: Record<string, unknown>[] | null;
+  artifacts: Record<string, unknown>[] | null;
+  is_seeded: boolean;
   created_at: string | null;
 }
 
