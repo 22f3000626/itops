@@ -255,7 +255,7 @@ export default function Dashboard() {
       {/* ── Editorial header ─────────────────────────────── */}
       <motion.div variants={fadeUp}>
         <div className="flex items-center gap-3 label-eyebrow !text-[10px] flex-wrap">
-          <span>Mission Control</span>
+          <span>Dynamic IT Operations Orchestrator</span>
           <span className="text-[var(--color-ink-faint)]">—</span>
           {regions.length > 0 ? (
             regions.map((r, i) => (

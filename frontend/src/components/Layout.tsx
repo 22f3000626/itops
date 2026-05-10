@@ -69,8 +69,12 @@ export default function Layout() {
             <span className="font-display text-[19px] text-[var(--color-ink)] leading-none">
               IT<span className="text-[var(--color-accent)] italic">ops</span>
             </span>
-            <span className="label-eyebrow !text-[9px] mt-1 leading-none">
-              Mission Control
+            <span
+              className="label-eyebrow !text-[8.5px] mt-1 leading-none whitespace-nowrap"
+              style={{ letterSpacing: '0.14em' }}
+              title="Dynamic IT Operations Orchestrator"
+            >
+              Dynamic IT Operations Orchestrator
             </span>
           </div>
         </div>
