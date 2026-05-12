@@ -1,0 +1,28 @@
+[Unit]
+Description=ITOps Backend (FastAPI / Uvicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/opt/itops/backend
+EnvironmentFile=/opt/itops/backend/.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+# Only 1 worker — SQLite does not support concurrent writers.
+ExecStart=/opt/itops/venv/bin/uvicorn app.main:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --workers 1 \
+    --log-level info
+
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=itops-backend
+
+[Install]
+WantedBy=multi-user.target
