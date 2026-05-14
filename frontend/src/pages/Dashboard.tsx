@@ -271,15 +271,15 @@ export default function Dashboard() {
           <span>{dateLabel}, {timeLabel}</span>
         </div>
 
-        <div className="mt-3 flex items-end justify-between gap-6 flex-wrap">
-          <h1 className="font-display text-[40px] leading-[1.05] text-[var(--color-ink)]">
+        <div className="mt-3 flex items-end justify-between gap-4 sm:gap-6 flex-wrap">
+          <h1 className="font-display text-[26px] sm:text-[32px] lg:text-[40px] leading-[1.1] lg:leading-[1.05] text-[var(--color-ink)]">
             {headline.title}{' '}
             <span className="text-[var(--color-ink-mute)] italic">
               {headline.sub}
             </span>
           </h1>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Link to="/pipeline" title="Open the Pipeline page to run agents on a node">
               <MagneticButton variant="solid">
                 <Zap size={13} /> Run pipeline
@@ -301,12 +301,12 @@ export default function Dashboard() {
       </motion.div>
 
       {/* ── Gauges + KPIs ─────────────────────────────────── */}
-      <motion.div variants={fadeUp} className="glass p-5 gpu">
+      <motion.div variants={fadeUp} className="glass p-4 sm:p-5 gpu">
         <motion.div
           variants={stagger(0.05)}
           className="grid grid-cols-1 md:grid-cols-8 gap-5 items-center"
         >
-          <div className="md:col-span-3 flex items-center gap-6 flex-wrap">
+          <div className="md:col-span-3 flex items-center justify-around md:justify-start gap-4 sm:gap-6 flex-wrap">
             <Gauge
               value={cpuAvg}
               label="CPU AVG"
@@ -361,10 +361,10 @@ export default function Dashboard() {
       </motion.div>
 
       {/* ── Pipeline + Telemetry ──────────────────────────── */}
-      <div className="grid lg:grid-cols-5 gap-6">
-        <GlassCard hover={false} tilt className="lg:col-span-3 !p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
+      <div className="grid lg:grid-cols-5 gap-4 sm:gap-6">
+        <GlassCard hover={false} tilt className="lg:col-span-3 !p-4 sm:!p-6">
+          <div className="flex items-start sm:items-center justify-between mb-6 flex-col sm:flex-row gap-2 sm:gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <h2
                 className="font-display text-[18px] text-[var(--color-ink)]"
                 title="Five specialized AI agents that run in sequence whenever an anomaly is detected"
@@ -398,7 +398,7 @@ export default function Dashboard() {
               className="absolute left-[5%] right-[5%] top-[20px] h-px"
               style={{ background: 'var(--color-hairline-strong)' }}
             />
-            <motion.div variants={stagger(0.08)} className="grid grid-cols-5 gap-4 relative">
+            <motion.div variants={stagger(0.08)} className="grid grid-cols-5 gap-2 sm:gap-4 relative">
               {PIPELINE_STEPS.map((s) => (
                 <PipelineStep key={s.key} Icon={s.Icon} label={s.label} sub={s.sub} />
               ))}
@@ -406,7 +406,7 @@ export default function Dashboard() {
           </div>
 
           <div className="mt-6 pt-4 hairline" />
-          <div className="flex items-center justify-center gap-6 mt-3 label-eyebrow !text-[9.5px]">
+          <div className="flex items-center justify-center gap-3 sm:gap-6 mt-3 label-eyebrow !text-[9.5px] flex-wrap text-center">
             <span title="Past incidents stored in the vector database, used by agents as RAG context">
               Memory · {safeStats.memory_incidents_stored.toLocaleString()} past incident{safeStats.memory_incidents_stored === 1 ? '' : 's'}
             </span>
@@ -417,7 +417,7 @@ export default function Dashboard() {
           </div>
         </GlassCard>
 
-        <GlassCard hover={false} className="lg:col-span-2 !p-6">
+        <GlassCard hover={false} className="lg:col-span-2 !p-4 sm:!p-6">
           <div className="flex items-center justify-between mb-4">
             <h2
               className="font-display text-[18px] text-[var(--color-ink)]"
@@ -483,8 +483,8 @@ export default function Dashboard() {
       </div>
 
       {/* ── Fleet table + Incidents feed ──────────────────── */}
-      <div className="grid lg:grid-cols-5 gap-6">
-        <GlassCard hover={false} className="lg:col-span-3 !p-6">
+      <div className="grid lg:grid-cols-5 gap-4 sm:gap-6">
+        <GlassCard hover={false} className="lg:col-span-3 !p-4 sm:!p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <h2
@@ -575,7 +575,7 @@ export default function Dashboard() {
           </div>
         </GlassCard>
 
-        <GlassCard hover={false} className="lg:col-span-2 !p-6">
+        <GlassCard hover={false} className="lg:col-span-2 !p-4 sm:!p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <h2

@@ -306,8 +306,8 @@ export default function Pipeline() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="font-display text-[28px] leading-tight text-[var(--color-ink)]">Run Pipeline</h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <h1 className="font-display text-[24px] sm:text-[28px] leading-tight text-[var(--color-ink)]">Run Pipeline</h1>
+        <p className="text-xs sm:text-sm text-slate-500 mt-1">
           Select a node, review its status, and trigger the full agent pipeline
         </p>
       </div>
@@ -383,15 +383,17 @@ export default function Pipeline() {
               className="w-full flex items-center justify-between bg-black/5 border border-glass-border rounded-lg px-4 py-3 text-sm text-left hover:border-accent/40 transition-colors"
             >
               {selectedNodeObj ? (
-                <div className="flex items-center gap-3">
-                  <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${statusColor(selectedNodeObj.status)}`}>
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                  <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${statusColor(selectedNodeObj.status)}`}>
                     {NODE_TYPE_ICONS[selectedNodeObj.node_type] || 'N'}
                   </span>
-                  <div>
+                  <div className="min-w-0 truncate">
                     <span className="text-slate-800 font-medium">{selectedNodeObj.node_name}</span>
-                    <span className="text-slate-400 ml-2 text-xs">({selectedNodeObj.node_type})</span>
+                    <span className="text-slate-400 ml-2 text-xs hidden sm:inline">({selectedNodeObj.node_type})</span>
                   </div>
-                  <StatusBadge status={selectedNodeObj.status} />
+                  <span className="ml-auto shrink-0">
+                    <StatusBadge status={selectedNodeObj.status} />
+                  </span>
                 </div>
               ) : (
                 <span className="text-slate-400">Choose a node to run pipeline on...</span>
@@ -464,11 +466,11 @@ export default function Pipeline() {
           )}
 
           {/* Action buttons */}
-          <div className="flex gap-3 mt-4">
+          <div className="flex gap-2 sm:gap-3 mt-4 flex-wrap">
             <button
               onClick={handleRunPipeline}
               disabled={running || !selectedNode}
-              className="flex items-center gap-2 px-6 py-2.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 sm:px-6 py-2.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
               Run Pipeline
@@ -476,7 +478,7 @@ export default function Pipeline() {
             <button
               onClick={handleRunAll}
               disabled={running}
-              className="flex items-center gap-2 px-5 py-2.5 bg-black/5 text-slate-600 rounded-lg text-sm font-medium hover:bg-black/10 transition-colors disabled:opacity-40"
+              className="flex items-center gap-2 px-4 sm:px-5 py-2.5 bg-black/5 text-slate-600 rounded-lg text-sm font-medium hover:bg-black/10 transition-colors disabled:opacity-40"
             >
               <RefreshCw size={14} />
               Run All Nodes
@@ -485,7 +487,7 @@ export default function Pipeline() {
               <button
                 onClick={handleSelectNewNode}
                 disabled={running}
-                className="flex items-center gap-2 px-5 py-2.5 border border-slate-200 text-slate-500 rounded-lg text-sm font-medium hover:bg-slate-50 hover:text-slate-700 hover:border-slate-300 transition-all disabled:opacity-40"
+                className="flex items-center gap-2 px-4 sm:px-5 py-2.5 border border-slate-200 text-slate-500 rounded-lg text-sm font-medium hover:bg-slate-50 hover:text-slate-700 hover:border-slate-300 transition-all disabled:opacity-40"
               >
                 <RotateCcw size={14} />
                 Select New Node

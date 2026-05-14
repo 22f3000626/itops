@@ -388,32 +388,31 @@ function LogViewerModal({ simulator, onClose }: { simulator: Simulator; onClose:
     <Portal>
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-lg flex items-center justify-center px-4"
+      className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-lg flex items-center justify-center px-3 sm:px-4"
       onClick={onClose}
     >
       <motion.div
         initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
         onClick={(e) => e.stopPropagation()}
-        className="glass-modal w-full max-w-5xl flex flex-col overflow-hidden"
-        style={{ height: '76vh' }}
+        className="glass-modal w-full max-w-5xl flex flex-col overflow-hidden h-[88vh] sm:h-[76vh]"
       >
         {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-200/60 shrink-0">
-          <Terminal size={15} className="text-slate-400" />
-          <span className="font-semibold text-slate-800 text-sm">{simulator.name}</span>
+        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-5 py-3 border-b border-slate-200/60 shrink-0 flex-wrap">
+          <Terminal size={15} className="text-slate-400 shrink-0" />
+          <span className="font-semibold text-slate-800 text-sm truncate">{simulator.name}</span>
           <StatusBadge status={wsStatus} pulse={wsStatus === 'running'} />
-          <span className={`flex items-center gap-1 text-xs ${connected ? 'text-green-500' : 'text-slate-400'}`}>
+          <span className={`hidden sm:flex items-center gap-1 text-xs ${connected ? 'text-green-500' : 'text-slate-400'}`}>
             {connected ? <Wifi size={11} /> : <WifiOff size={11} />}
             {connected ? 'Live' : 'Disconnected'}
           </span>
           {!connected && <button onClick={reconnect} className="text-xs text-accent hover:underline">Reconnect</button>}
           <div className="ml-auto flex items-center gap-2">
             {isMetrics ? (
-              <span className="text-xs text-slate-400 tabular-nums">
+              <span className="hidden sm:inline text-xs text-slate-400 tabular-nums">
                 {logs.length} {logs.length === 1 ? 'line' : 'lines'} streamed
               </span>
             ) : (
-              <span className="text-xs text-slate-400 tabular-nums">{currentLine} / {totalLines} lines</span>
+              <span className="hidden sm:inline text-xs text-slate-400 tabular-nums">{currentLine} / {totalLines} lines</span>
             )}
             <button onClick={clearLogs} className="px-2.5 py-1 bg-black/5 hover:bg-black/10 text-slate-500 text-xs rounded-lg transition-colors">Clear</button>
             <button onClick={onClose} className="p-1.5 hover:bg-black/8 rounded-lg transition-colors"><X size={15} className="text-slate-400" /></button>
@@ -457,7 +456,7 @@ function LogViewerModal({ simulator, onClose }: { simulator: Simulator; onClose:
 
           {/* Live metrics panel — log-file simulators only */}
           {hasMetricsPanel && liveMetrics && (
-            <div className="w-56 shrink-0 border-l border-slate-200/30 bg-slate-900/60 p-4 space-y-3 overflow-auto">
+            <div className="hidden md:flex md:flex-col w-56 shrink-0 border-l border-slate-200/30 bg-slate-900/60 p-4 gap-3 overflow-auto">
               <div className="flex items-center gap-1.5 mb-2">
                 <Activity size={12} className="text-accent" />
                 <span className="text-xs font-semibold text-slate-300">Live Metrics</span>
@@ -653,21 +652,21 @@ export default function Simulators() {
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-3 sm:gap-4">
         <div>
-          <h1 className="font-display text-[28px] leading-tight text-[var(--color-ink)]">Simulators</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <h1 className="font-display text-[24px] sm:text-[28px] leading-tight text-[var(--color-ink)]">Simulators</h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
             EC2 / VM, database, and fleet metrics simulators — stream logs &amp; metrics in real time
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {running > 0 && (
             <span className="flex items-center gap-1.5 text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-200">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 pulse-live" />{running} running
             </span>
           )}
           <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors shadow-sm"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors shadow-sm"
           >
             <Plus size={15} />New Simulator
           </button>
@@ -676,7 +675,7 @@ export default function Simulators() {
 
       {/* Stats */}
       {list.length > 0 && (
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: 'Total',    value: list.length,                                              color: 'text-slate-700' },
             { label: 'Running',  value: running,                                                  color: 'text-green-600' },
@@ -704,7 +703,7 @@ export default function Simulators() {
           </button>
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 xl:grid-cols-4 lg:grid-cols-3 gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           <AnimatePresence mode="popLayout">
             {list.map((sim, i) => (
               <motion.div key={sim.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: i * 0.04 }}>

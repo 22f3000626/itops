@@ -40,16 +40,16 @@ export default function Infrastructure() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-3 sm:gap-4">
         <div>
-          <h1 className="font-display text-[28px] leading-tight text-[var(--color-ink)]">Infrastructure</h1>
-          <p className="text-sm text-slate-500 mt-1">Monitored nodes and their metric histories</p>
+          <h1 className="font-display text-[24px] sm:text-[28px] leading-tight text-[var(--color-ink)]">Infrastructure</h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">Monitored nodes and their metric histories</p>
         </div>
         {/* Filter pills */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {(['all', 'critical', 'degraded', 'healthy', 'offline'] as const).map((f) => (
             <button key={f} onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filter === f
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filter === f
                 ? 'bg-accent text-white'
                 : 'bg-black/5 text-slate-500 hover:bg-black/10'
                 }`}
@@ -149,7 +149,7 @@ function NodeDetail({ node, onClose }: { node: InfraNode; onClose: () => void })
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-lg flex items-start justify-center pt-20 px-4"
+      className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-lg flex items-start justify-center pt-10 sm:pt-20 px-3 sm:px-4"
       onClick={onClose}
     >
       <motion.div
@@ -157,12 +157,12 @@ function NodeDetail({ node, onClose }: { node: InfraNode; onClose: () => void })
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
         onClick={e => e.stopPropagation()}
-        className="glass-modal w-full max-w-3xl max-h-[75vh] overflow-y-auto p-6 space-y-5"
+        className="glass-modal w-full max-w-3xl max-h-[85vh] sm:max-h-[75vh] overflow-y-auto p-4 sm:p-6 space-y-5"
       >
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-slate-800">{node.node_name}</h2>
-            <p className="text-xs text-slate-500">{node.node_type} &middot; {node.provider} &middot; {node.region} &middot; {node.ip_address}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-base sm:text-lg font-bold text-slate-800 truncate">{node.node_name}</h2>
+            <p className="text-[11px] sm:text-xs text-slate-500 break-words">{node.node_type} &middot; {node.provider} &middot; {node.region} &middot; {node.ip_address}</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-black/8 rounded-lg transition-colors">
             <X size={18} className="text-slate-500" />

@@ -50,8 +50,8 @@ export default function Incidents() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <div>
-        <h1 className="font-display text-[28px] leading-tight text-[var(--color-ink)]">Incidents</h1>
-        <p className="text-sm text-slate-500 mt-1">Detected anomalies, diagnostics, and remediation tracking</p>
+        <h1 className="font-display text-[24px] sm:text-[28px] leading-tight text-[var(--color-ink)]">Incidents</h1>
+        <p className="text-xs sm:text-sm text-slate-500 mt-1">Detected anomalies, diagnostics, and remediation tracking</p>
       </div>
 
 
@@ -85,16 +85,21 @@ export default function Incidents() {
                     setExpanded(next);
                     if (next != null) void loadRemediation(inc.id);
                   }}
-                  className="flex items-center gap-4 p-4 cursor-pointer hover:bg-green-50/50"
+                  className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 cursor-pointer hover:bg-green-50/50"
                 >
-                  <span className="text-sm font-mono text-slate-400 w-12">#{inc.id}</span>
+                  <span className="text-xs sm:text-sm font-mono text-slate-400 w-8 sm:w-12 shrink-0">#{inc.id}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-slate-800 truncate">{inc.title}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{inc.node_name} &middot; {inc.detected_at ? new Date(inc.detected_at).toLocaleString() : ''}</p>
+                    <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 truncate">{inc.node_name} &middot; {inc.detected_at ? new Date(inc.detected_at).toLocaleString() : ''}</p>
                   </div>
-                  <StatusBadge status={inc.severity} />
-                  <StatusBadge status={inc.status} />
-                  {isOpen ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+                  <div className="hidden sm:flex items-center gap-2 shrink-0">
+                    <StatusBadge status={inc.severity} />
+                    <StatusBadge status={inc.status} />
+                  </div>
+                  <div className="flex sm:hidden shrink-0">
+                    <StatusBadge status={inc.severity} />
+                  </div>
+                  {isOpen ? <ChevronUp size={16} className="text-slate-400 shrink-0" /> : <ChevronDown size={16} className="text-slate-400 shrink-0" />}
                 </div>
 
                 {/* Expanded detail */}
@@ -265,7 +270,7 @@ export default function Incidents() {
 
         {/* ── Pagination controls ─────────────────────────── */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between pt-4">
+          <div className="flex items-center justify-between pt-4 flex-wrap gap-3">
             <p className="text-xs text-slate-400">
               Showing <b className="text-slate-600">{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, incidentList.length)}</b> of <b className="text-slate-600">{incidentList.length}</b> incidents
             </p>

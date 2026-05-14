@@ -11,6 +11,7 @@ interface GlassTabProps {
   layoutId?: string;
   onClick?: () => void;
   hideIcon?: boolean;
+  fullWidth?: boolean;
 }
 
 const GlassTab: React.FC<GlassTabProps> = ({
@@ -20,11 +21,12 @@ const GlassTab: React.FC<GlassTabProps> = ({
   layoutId = 'activeNavPill',
   onClick,
   hideIcon = false,
+  fullWidth = false,
 }) => {
   return (
-    <NavLink to={to} onClick={onClick} end={to === '/'}>
+    <NavLink to={to} onClick={onClick} end={to === '/'} className={fullWidth ? 'block w-full' : undefined}>
       {({ isActive }) => (
-        <div className={`glass-nav-tab press-tactile ${isActive ? 'glass-nav-tab-active' : ''}`}>
+        <div className={`glass-nav-tab press-tactile ${fullWidth ? '!flex !w-full !justify-start !py-2.5 !text-[14px]' : ''} ${isActive ? 'glass-nav-tab-active' : ''}`}>
           {isActive && (
             <motion.div
               layoutId={layoutId}

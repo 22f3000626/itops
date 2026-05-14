@@ -313,13 +313,13 @@ export default function Settings() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-3 sm:gap-4">
         <div>
-          <h1 className="font-display text-[28px] leading-tight text-[var(--color-ink)] flex items-center gap-3">
-            <SettingsIcon size={22} className="text-[var(--color-accent)]" />
+          <h1 className="font-display text-[24px] sm:text-[28px] leading-tight text-[var(--color-ink)] flex items-center gap-3">
+            <SettingsIcon size={20} className="text-[var(--color-accent)]" />
             Settings
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Configure your active LLM provider, pipeline behaviour, and runtime options
           </p>
         </div>
@@ -367,7 +367,7 @@ export default function Settings() {
             </div>
           </div>
           
-          <div className="grid sm:grid-cols-3 gap-4 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-6">
             {(Object.keys(PROVIDER_META) as LlmProvider[]).map((p) => {
               const { label, subtitle, description, Icon } = PROVIDER_META[p];
               const active = activeProvider === p;
@@ -540,8 +540,8 @@ export default function Settings() {
           {/* API key */}
           <label className="text-xs text-slate-500 mb-1.5 block">API Key</label>
           {settings.openai_api_key_set && !openaiKeyDraft && (
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex-1 glass-sm rounded-lg px-3 py-2.5 text-sm font-mono text-slate-700 flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-4 flex-wrap sm:flex-nowrap">
+              <div className="flex-1 min-w-[180px] glass-sm rounded-lg px-3 py-2.5 text-sm font-mono text-slate-700 flex items-center gap-2">
                 <KeyRound size={14} className="text-emerald-500" />
                 ••••••••••••••••
                 <span className="ml-auto text-[10px] text-emerald-600">saved</span>
@@ -561,8 +561,8 @@ export default function Settings() {
             </div>
           )}
           {(!settings.openai_api_key_set || openaiKeyDraft) && (
-            <div className="flex items-center gap-2 mb-4">
-              <div className="relative flex-1">
+            <div className="flex items-center gap-2 mb-4 flex-wrap sm:flex-nowrap">
+              <div className="relative flex-1 min-w-[180px]">
                 <input
                   type={showOpenaiKey ? 'text' : 'password'}
                   value={openaiKeyDraft.trim() === '' ? openaiKeyDraft : openaiKeyDraft}
@@ -687,8 +687,8 @@ export default function Settings() {
           {/* API key */}
           <label className="text-xs text-slate-500 mb-1.5 block">API Key</label>
           {settings.gemini_api_key_set && !geminiKeyDraft && (
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex-1 glass-sm rounded-lg px-3 py-2.5 text-sm font-mono text-slate-700 flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-4 flex-wrap sm:flex-nowrap">
+              <div className="flex-1 min-w-[180px] glass-sm rounded-lg px-3 py-2.5 text-sm font-mono text-slate-700 flex items-center gap-2">
                 <KeyRound size={14} className="text-emerald-500" />
                 ••••••••••••••••
                 <span className="ml-auto text-[10px] text-emerald-600">saved</span>
@@ -708,8 +708,8 @@ export default function Settings() {
             </div>
           )}
           {(!settings.gemini_api_key_set || geminiKeyDraft) && (
-            <div className="flex items-center gap-2 mb-4">
-              <div className="relative flex-1">
+            <div className="flex items-center gap-2 mb-4 flex-wrap sm:flex-nowrap">
+              <div className="relative flex-1 min-w-[180px]">
                 <input
                   type={showGeminiKey ? 'text' : 'password'}
                   value={geminiKeyDraft.trim() === '' ? geminiKeyDraft : geminiKeyDraft}
@@ -1026,7 +1026,7 @@ export default function Settings() {
             </div>
 
             {/* Interval */}
-            <div className="mt-3 flex items-center gap-3">
+            <div className="mt-3 flex items-center gap-3 flex-wrap">
               <input
                 type="number"
                 min={5}
@@ -1046,7 +1046,7 @@ export default function Settings() {
                 }`}
               />
               <span className="text-sm text-slate-500">seconds</span>
-              <div className="flex gap-1.5 ml-auto">
+              <div className="flex gap-1.5 ml-auto flex-wrap">
                 {[10, 30, 60, 120, 300].map((s) => (
                   <button
                     key={s}

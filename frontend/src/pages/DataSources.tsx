@@ -110,8 +110,8 @@ export default function DataSources() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <div>
-        <h1 className="font-display text-[28px] leading-tight text-[var(--color-ink)]">Data Sources</h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <h1 className="font-display text-[24px] sm:text-[28px] leading-tight text-[var(--color-ink)]">Data Sources</h1>
+        <p className="text-xs sm:text-sm text-slate-500 mt-1">
           Connect to cloud platforms, monitoring tools, or use simulated data
         </p>
       </div>
@@ -154,7 +154,7 @@ export default function DataSources() {
       {/* ── Provider cards ────────────────────────────────────── */}
       <div>
         <h2 className="text-sm font-semibold text-slate-600 mb-3">Available Providers</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {providers.map((prov, i) => {
             const Icon = PROVIDER_ICONS[prov.id] || Database;
             const c = PROVIDER_COLORS[prov.id] || PROVIDER_COLORS.simulated;

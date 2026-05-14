@@ -103,7 +103,7 @@ function RunbookCard({ rb, isOpen, onToggle }: { rb: RunbookEntry; isOpen: boole
       {/* Header row */}
       <div
         onClick={onToggle}
-        className="flex items-center gap-3 p-4 cursor-pointer hover:bg-green-50/40"
+        className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 cursor-pointer hover:bg-green-50/40"
       >
         <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
           <BookOpen size={15} className="text-accent" />
@@ -139,10 +139,10 @@ function RunbookCard({ rb, isOpen, onToggle }: { rb: RunbookEntry; isOpen: boole
           <p className="text-xs text-slate-400 mt-0.5 truncate">{rb.problem_pattern}</p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {rb.source_incident_id != null && (
             <span
-              className="flex items-center gap-1 text-xs text-slate-400"
+              className="hidden sm:flex items-center gap-1 text-xs text-slate-400"
               title={`Generated from incident #${rb.source_incident_id}`}
             >
               <Hash size={10} />{rb.source_incident_id}
@@ -152,10 +152,10 @@ function RunbookCard({ rb, isOpen, onToggle }: { rb: RunbookEntry; isOpen: boole
             className="text-xs font-mono text-slate-600"
             title="Effectiveness score — how well this runbook has resolved past incidents (higher is better)"
           >
-            {rb.effectiveness_score.toFixed(1)} <span className="text-slate-400">eff</span>
+            {rb.effectiveness_score.toFixed(1)} <span className="text-slate-400 hidden sm:inline">eff</span>
           </span>
           <span
-            className="text-xs text-slate-500"
+            className="hidden sm:inline text-xs text-slate-500"
             title="How many times this runbook has been retrieved or applied"
           >
             {rb.times_used} {rb.times_used === 1 ? 'apply' : 'applies'}
@@ -426,8 +426,8 @@ export default function Runbooks() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       {/* ── Header ───────────────────────────────────────────── */}
       <div>
-        <h1 className="font-display text-[28px] leading-tight text-[var(--color-ink)]">Runbooks</h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <h1 className="font-display text-[24px] sm:text-[28px] leading-tight text-[var(--color-ink)]">Runbooks</h1>
+        <p className="text-xs sm:text-sm text-slate-500 mt-1">
           Playbooks for known issues — built-in canonical runbooks plus auto-generated ones from past resolved incidents.
         </p>
       </div>
@@ -444,8 +444,8 @@ export default function Runbooks() {
         </div>
 
         {/* Search input */}
-        <div className="flex gap-3">
-          <div className="flex-1 relative">
+        <div className="flex gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
+          <div className="flex-1 min-w-[180px] relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={searchQuery}
@@ -458,7 +458,7 @@ export default function Runbooks() {
           <button
             onClick={handleSearch}
             disabled={searching || !searchQuery.trim()}
-            className="flex items-center gap-2 px-5 py-2.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-40"
+            className="flex items-center gap-2 px-4 sm:px-5 py-2.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-40 shrink-0"
           >
             {searching ? (
               <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -597,7 +597,7 @@ export default function Runbooks() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4">
+            <div className="flex items-center justify-between pt-4 flex-wrap gap-3">
               <p className="text-xs text-slate-400">
                 Showing <b className="text-slate-600">{(rbPage - 1) * PAGE_SIZE + 1}–{Math.min(rbPage * PAGE_SIZE, filteredSorted.length)}</b> of <b className="text-slate-600">{filteredSorted.length}</b>
               </p>
