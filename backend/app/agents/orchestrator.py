@@ -254,6 +254,7 @@ async def reporting_node(state: OrchestratorState) -> dict:
         metrics=state["metrics"],
         outcome="resolved",
         log_history=state.get("log_history", "No logs available"),
+        agent_trace=state.get("agent_trace", []),
     )
 
     trace_entry = {
