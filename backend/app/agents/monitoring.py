@@ -9,14 +9,55 @@ the pipeline can respond quickly without waiting on an LLM.
 
 import re
 
-THRESHOLDS = {
-    "cpu_percent": {"warning": 75, "high": 85, "critical": 95},
-    "memory_percent": {"warning": 70, "high": 85, "critical": 95},
-    "disk_percent": {"warning": 80, "high": 90, "critical": 95},
-    "error_rate": {"warning": 2, "high": 5, "critical": 15},
-    "latency_ms": {"warning": 100, "high": 500, "critical": 2000},
-    "network_in_mbps": {"warning": 800, "high": 900, "critical": 950},
+NODE_TYPE_THRESHOLDS: dict[str, dict] = {
+    "server": {
+        "cpu_percent":     {"warning": 75, "high": 85, "critical": 95},
+        "memory_percent":  {"warning": 70, "high": 85, "critical": 95},
+        "disk_percent":    {"warning": 80, "high": 90, "critical": 95},
+        "error_rate":      {"warning": 2,  "high": 5,  "critical": 15},
+        "latency_ms":      {"warning": 100,"high": 500,"critical": 2000},
+        "network_in_mbps": {"warning": 800,"high": 900,"critical": 950},
+    },
+    "database": {
+        "cpu_percent":     {"warning": 60, "high": 75, "critical": 90},
+        "memory_percent":  {"warning": 80, "high": 90, "critical": 97},
+        "disk_percent":    {"warning": 70, "high": 85, "critical": 95},
+        "error_rate":      {"warning": 1,  "high": 3,  "critical": 10},
+        "latency_ms":      {"warning": 200,"high": 1000,"critical": 5000},
+        "network_in_mbps": {"warning": 700,"high": 850,"critical": 950},
+    },
+    "cache": {
+        "cpu_percent":     {"warning": 70, "high": 85, "critical": 95},
+        "memory_percent":  {"warning": 85, "high": 92, "critical": 97},
+        "disk_percent":    {"warning": 80, "high": 90, "critical": 95},
+        "error_rate":      {"warning": 1,  "high": 3,  "critical": 10},
+        "latency_ms":      {"warning": 10, "high": 50, "critical": 200},
+        "network_in_mbps": {"warning": 800,"high": 900,"critical": 950},
+    },
+    "load_balancer": {
+        "cpu_percent":     {"warning": 60, "high": 75, "critical": 90},
+        "memory_percent":  {"warning": 65, "high": 80, "critical": 92},
+        "disk_percent":    {"warning": 70, "high": 85, "critical": 95},
+        "error_rate":      {"warning": 1,  "high": 3,  "critical": 10},
+        "latency_ms":      {"warning": 50, "high": 200,"critical": 1000},
+        "network_in_mbps": {"warning": 700,"high": 850,"critical": 950},
+    },
+    "queue": {
+        "cpu_percent":     {"warning": 65, "high": 80, "critical": 92},
+        "memory_percent":  {"warning": 75, "high": 88, "critical": 95},
+        "disk_percent":    {"warning": 75, "high": 88, "critical": 96},
+        "error_rate":      {"warning": 2,  "high": 5,  "critical": 15},
+        "latency_ms":      {"warning": 200,"high": 1000,"critical": 5000},
+        "network_in_mbps": {"warning": 700,"high": 850,"critical": 950},
+    },
 }
+
+# Backwards-compatible alias used by any existing code referencing THRESHOLDS
+THRESHOLDS = NODE_TYPE_THRESHOLDS["server"]
+
+
+def _get_thresholds(node_type: str | None) -> dict:
+    return NODE_TYPE_THRESHOLDS.get((node_type or "server").lower(), NODE_TYPE_THRESHOLDS["server"])
 
 SEVERITY_RANK = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 
@@ -80,15 +121,17 @@ LOG_LEVEL_SEVERITY = {
 }
 
 
-def statistical_anomaly_check(metrics: dict) -> dict:
-    """Fast threshold-based anomaly check."""
+def statistical_anomaly_check(metrics: dict, node_type: str | None = None) -> dict:
+    """Threshold-based anomaly check using per-node-type baselines."""
+    effective_type = node_type or metrics.get("node_type")
+    thresholds = _get_thresholds(effective_type)
     anomalies = []
     max_severity = "low"
 
-    for metric_key, thresholds in THRESHOLDS.items():
+    for metric_key, threshold_set in thresholds.items():
         value = metrics.get(metric_key, 0)
         for level in ["critical", "high", "warning"]:
-            if value >= thresholds[level]:
+            if value >= threshold_set[level]:
                 sev = "critical" if level == "critical" else ("high" if level == "high" else "medium")
                 anomalies.append({"metric": metric_key, "value": value, "severity": sev})
                 if SEVERITY_RANK.get(sev, 0) > SEVERITY_RANK.get(max_severity, 0):
@@ -96,12 +139,18 @@ def statistical_anomaly_check(metrics: dict) -> dict:
                 break
 
     if not anomalies:
-        return {"is_anomaly": False, "max_severity": None, "anomalies": []}
+        return {
+            "is_anomaly": False,
+            "max_severity": None,
+            "anomalies": [],
+            "threshold_profile": effective_type or "server",
+        }
 
     return {
         "is_anomaly": True,
         "anomalies": anomalies,
         "max_severity": max_severity,
+        "threshold_profile": effective_type or "server",
     }
 
 
@@ -141,6 +190,52 @@ def _clean_log_lines(log_history: str) -> list[str]:
     if not log_history or log_history.strip() in NO_LOG_HISTORY_MARKERS:
         return []
     return [line.strip() for line in log_history.splitlines() if line.strip()]
+
+
+_HISTORY_LINE_PATTERN = re.compile(
+    r"CPU=(?P<cpu>[\d.]+)% MEM=(?P<mem>[\d.]+)% DISK=(?P<disk>[\d.]+)% "
+    r"ERR=(?P<err>[\d.]+)% LAT=(?P<lat>[\d.]+)ms NET_IN=(?P<net>[\d.]+)Mbps"
+)
+
+_VELOCITY_THRESHOLDS = {
+    "cpu": 5.0, "mem": 4.0, "disk": 2.0,
+    "err": 1.5, "lat": 100.0, "net": 50.0,
+}
+
+_VELOCITY_METRIC_MAP = {
+    "cpu": "cpu_percent", "mem": "memory_percent", "disk": "disk_percent",
+    "err": "error_rate",  "lat": "latency_ms",     "net": "network_in_mbps",
+}
+
+
+def _parse_history_readings(metric_history: str) -> list[dict[str, float]]:
+    readings: list[dict[str, float]] = []
+    if not metric_history or "No history" in metric_history:
+        return readings
+    for line in metric_history.splitlines():
+        m = _HISTORY_LINE_PATTERN.search(line)
+        if m:
+            readings.append({k: float(v) for k, v in m.groupdict().items()})
+    return readings[-6:]
+
+
+def _compute_trend_signals(readings: list[dict[str, float]]) -> list[dict]:
+    if len(readings) < 2:
+        return []
+    signals = []
+    for key, canonical in _VELOCITY_METRIC_MAP.items():
+        vals = [r[key] for r in readings if key in r]
+        if len(vals) < 2:
+            continue
+        velocity = (vals[-1] - vals[0]) / max(len(vals) - 1, 1)
+        threshold = _VELOCITY_THRESHOLDS.get(key, 5.0)
+        if abs(velocity) >= threshold:
+            signals.append({
+                "metric": canonical,
+                "direction": "rising" if velocity > 0 else "falling",
+                "velocity_per_cycle": round(velocity, 3),
+            })
+    return signals
 
 
 def log_anomaly_check(log_history: str) -> dict:
@@ -262,8 +357,11 @@ def preliminary_monitoring_check(metrics: dict, log_history: str = "No logs avai
     This keeps the fast path cheap while ensuring the pipeline can trigger
     from either signal source when only one is available.
     """
-    metric_result = statistical_anomaly_check(metrics)
+    node_type = metrics.get("node_type")
+    metric_result = statistical_anomaly_check(metrics, node_type=node_type)
     log_result = log_anomaly_check(log_history)
+    readings = _parse_history_readings(log_history if log_history else "")
+    trend_signals = _compute_trend_signals(readings)
 
     sources = []
     if metric_result.get("is_anomaly"):
@@ -282,6 +380,8 @@ def preliminary_monitoring_check(metrics: dict, log_history: str = "No logs avai
             "description": "All available metrics and logs appear normal.",
             "metrics_check": metric_result,
             "log_check": log_result,
+            "trend_signals": trend_signals,
+            "threshold_profile": metric_result.get("threshold_profile", node_type or "server"),
         }
 
     max_severity = _max_severity(
@@ -302,6 +402,8 @@ def preliminary_monitoring_check(metrics: dict, log_history: str = "No logs avai
         "description": _build_description(metric_result, log_result, anomaly_type),
         "metrics_check": metric_result,
         "log_check": log_result,
+        "trend_signals": trend_signals,
+        "threshold_profile": metric_result.get("threshold_profile", node_type or "server"),
     }
 
 
@@ -322,6 +424,8 @@ async def analyze_metrics(metrics: dict, log_history: str = "No logs available")
             "combined_precheck": precheck,
             "detection_sources": [],
             "reasoning": "No abnormal metric or log signal was found.",
+            "trend_signals": precheck.get("trend_signals", []),
+            "threshold_profile": precheck.get("threshold_profile", "server"),
         }
 
     result = {
@@ -337,5 +441,7 @@ async def analyze_metrics(metrics: dict, log_history: str = "No logs available")
         "combined_precheck": precheck,
         "detection_sources": precheck["sources"],
         "reasoning": _reasoning_summary(precheck),
+        "trend_signals": precheck.get("trend_signals", []),
+        "threshold_profile": precheck.get("threshold_profile", "server"),
     }
     return result
