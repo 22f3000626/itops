@@ -52,37 +52,80 @@ def _parse_history_tail(metric_history: str) -> list[dict[str, float]]:
         match = pattern.search(line)
         if not match:
             continue
-        readings.append({
-            "cpu": float(match.group("cpu")),
-            "mem": float(match.group("mem")),
-            "disk": float(match.group("disk")),
-            "err": float(match.group("err")),
-            "lat": float(match.group("lat")),
-            "net": float(match.group("net")),
-        })
-    return readings[-5:]
+        readings.append({k: float(v) for k, v in match.groupdict().items()})
+    return readings[-8:]
+
+
+def _ewma(values: list[float], alpha: float = 0.3) -> list[float]:
+    """Exponential Weighted Moving Average."""
+    if not values:
+        return []
+    result = [values[0]]
+    for v in values[1:]:
+        result.append(alpha * v + (1.0 - alpha) * result[-1])
+    return result
+
+
+def _ewma_slope(values: list[float], alpha: float = 0.3) -> float:
+    """Slope of the EWMA series normalised by number of steps."""
+    if len(values) < 2:
+        return 0.0
+    smoothed = _ewma(values, alpha)
+    return (smoothed[-1] - smoothed[0]) / max(len(smoothed) - 1, 1)
 
 
 def _trend_boost(metrics: dict, history: list[dict[str, float]]) -> float:
+    """EWMA-based trend scoring — steeper slope = higher boost."""
     if not history:
         return 0.0
 
-    latest = history[-1]
-    oldest = history[0]
     boost = 0.0
 
-    if metrics.get("memory_percent", 0) >= 85 and (latest["mem"] - oldest["mem"]) >= 8:
-        boost += 0.08
-    if metrics.get("disk_percent", 0) >= 90 and (latest["disk"] - oldest["disk"]) >= 2:
-        boost += 0.07
-    if metrics.get("error_rate", 0) >= 5 and (latest["err"] - oldest["err"]) >= 2:
-        boost += 0.08
-    if metrics.get("latency_ms", 0) >= 500 and (latest["lat"] - oldest["lat"]) >= 200:
-        boost += 0.07
-    if metrics.get("cpu_percent", 0) >= 85 and (latest["cpu"] - oldest["cpu"]) >= 8:
-        boost += 0.05
+    if metrics.get("memory_percent", 0) >= 80:
+        slope = _ewma_slope([r["mem"] for r in history if "mem" in r])
+        if slope >= 2.0:
+            boost += min(0.12, slope * 0.015)
+
+    if metrics.get("disk_percent", 0) >= 80:
+        slope = _ewma_slope([r["disk"] for r in history if "disk" in r])
+        if slope >= 1.0:
+            boost += min(0.10, slope * 0.02)
+
+    if metrics.get("error_rate", 0) >= 3:
+        slope = _ewma_slope([r["err"] for r in history if "err" in r])
+        if slope >= 0.5:
+            boost += min(0.12, slope * 0.025)
+
+    if metrics.get("latency_ms", 0) >= 300:
+        slope = _ewma_slope([r["lat"] for r in history if "lat" in r])
+        if slope >= 50.0:
+            boost += min(0.10, slope * 0.0005)
+
+    if metrics.get("cpu_percent", 0) >= 80:
+        slope = _ewma_slope([r["cpu"] for r in history if "cpu" in r])
+        if slope >= 2.0:
+            boost += min(0.08, slope * 0.012)
 
     return boost
+
+
+def _multi_metric_correlation_bonus(metrics: dict) -> float:
+    """Extra probability boost when 3+ metrics are simultaneously elevated."""
+    elevated = sum([
+        metrics.get("cpu_percent", 0) >= 80,
+        metrics.get("memory_percent", 0) >= 80,
+        metrics.get("disk_percent", 0) >= 80,
+        metrics.get("error_rate", 0) >= 5,
+        metrics.get("latency_ms", 0) >= 500,
+        metrics.get("network_in_mbps", 0) >= 800,
+    ])
+    if elevated >= 5:
+        return 0.12
+    if elevated >= 4:
+        return 0.08
+    if elevated >= 3:
+        return 0.05
+    return 0.0
 
 
 def _metric_pressure(metrics: dict) -> float:
@@ -132,6 +175,7 @@ async def predict_failure(
     score = SEVERITY_BASE_SCORE.get(severity, 0.45)
     score += _metric_pressure(metrics)
     score += _trend_boost(metrics, history)
+    score += _multi_metric_correlation_bonus(metrics)
 
     if anomaly_type == "cascading_failure":
         score = max(score, 0.92)
@@ -182,5 +226,10 @@ async def predict_failure(
         "estimated_time_to_failure": estimated_time_to_failure,
         "recommended_urgency": recommended_urgency,
         "reasoning": "; ".join(reasoning_parts) + ".",
+        "ewma_scores": {
+            "cpu_slope": round(_ewma_slope([r["cpu"] for r in history if "cpu" in r]), 3),
+            "mem_slope": round(_ewma_slope([r["mem"] for r in history if "mem" in r]), 3),
+            "err_slope": round(_ewma_slope([r["err"] for r in history if "err" in r]), 3),
+        },
         "agent": "predictive",
     }
