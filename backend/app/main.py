@@ -316,6 +316,79 @@ async def _process_event(
     return stat_result
 
 
+async def _start_cloud_adapters() -> None:
+    """Connect and register any cloud adapters that have credentials configured."""
+    from app.services.settings_service import settings as _rt_settings
+    from app.data_sources.cloudwatch import CloudWatchDataSource
+    from app.data_sources.azure_monitor import AzureMonitorDataSource
+    from app.data_sources.gcp_monitoring import GCPMonitoringDataSource
+
+    adapters = [
+        (
+            "cloudwatch",
+            CloudWatchDataSource,
+            lambda s: bool(s.cloudwatch_access_key_id and s.cloudwatch_secret_access_key),
+        ),
+        (
+            "azure",
+            AzureMonitorDataSource,
+            lambda s: bool(s.azure_tenant_id and s.azure_client_id and s.azure_client_secret and s.azure_subscription_id),
+        ),
+        (
+            "gcp",
+            GCPMonitoringDataSource,
+            lambda s: bool(s.gcp_project_id and s.gcp_service_account_json),
+        ),
+    ]
+    for name, cls, has_creds in adapters:
+        if not has_creds(_rt_settings):
+            continue
+        try:
+            adapter = cls()
+            await adapter.connect()
+            registry.register(adapter)
+            asyncio.create_task(_cloud_polling_loop(adapter))
+            logger.info("Cloud adapter registered on startup: %s", name)
+        except Exception as exc:
+            logger.warning("Cloud adapter %s failed to connect on startup: %s", name, exc)
+
+
+async def _cloud_polling_loop(adapter) -> None:
+    """Drive a cloud adapter's stream_metrics loop through _process_event."""
+    from app.api.routes.ws import manager as ws_manager
+    logger.info("Cloud polling loop started: %s", adapter.provider_name)
+    try:
+        async for batch in adapter.stream_metrics():
+            db = SessionLocal()
+            try:
+                infra_svc = InfraService(db)
+                ws_payloads = []
+                for event in batch:
+                    stat_result = await _process_event(
+                        event,
+                        infra_svc,
+                        None,
+                        db,
+                        sim_source=None,
+                        generate_correlated_logs=False,
+                    )
+                    ws_payloads.append(_event_to_ws_payload(event, stat_result))
+                db.commit()
+                if ws_payloads:
+                    import json as _json
+                    await ws_manager.broadcast(_json.dumps({
+                        "type": "metrics_batch",
+                        "data": ws_payloads,
+                    }))
+            except Exception as exc:
+                logger.error("Cloud poll processing error (%s): %s", adapter.provider_name, exc)
+                db.rollback()
+            finally:
+                db.close()
+    except Exception as exc:
+        logger.error("Cloud polling loop crashed (%s): %s", adapter.provider_name, exc)
+
+
 async def background_monitoring_loop():
     """
     Continuous background loop that:
@@ -334,6 +407,9 @@ async def background_monitoring_loop():
     sim = SimulatorDataSource()
     await sim.connect()
     registry.register(sim)
+
+    # Start any cloud adapters that have credentials pre-configured
+    await _start_cloud_adapters()
 
     logger.info("Background monitoring loop started")
 

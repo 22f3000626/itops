@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -251,6 +252,120 @@ def test_llm_provider(body: TestProviderRequest) -> dict[str, Any]:
     base_url = body.base_url or snapshot["ollama_base_url"]
     model = body.model or snapshot["ollama_model"]
     return _test_provider("ollama", model=model, base_url=base_url)
+
+
+# ── Cloud provider configuration endpoints ───────────────────
+
+
+class CloudWatchConfig(BaseModel):
+    access_key_id: str
+    secret_access_key: str
+    region: str = "us-east-1"
+    instance_ids: list[str] = []
+    poll_interval_seconds: int = 30
+
+
+class AzureMonitorConfig(BaseModel):
+    tenant_id: str
+    client_id: str
+    client_secret: str
+    subscription_id: str
+    resource_group: str = ""
+    poll_interval_seconds: int = 30
+
+
+class GCPMonitoringConfig(BaseModel):
+    project_id: str
+    service_account_json: str
+    zone: str = ""
+    poll_interval_seconds: int = 30
+
+
+@router.post("/cloudwatch")
+async def configure_cloudwatch(body: CloudWatchConfig) -> dict:
+    """Save AWS CloudWatch credentials, test connection, and register the adapter."""
+    settings.update(
+        cloudwatch_access_key_id=body.access_key_id,
+        cloudwatch_secret_access_key=body.secret_access_key,
+        cloudwatch_region=body.region,
+        cloudwatch_instance_ids=body.instance_ids,
+        cloudwatch_poll_interval_seconds=body.poll_interval_seconds,
+    )
+    from app.data_sources.cloudwatch import CloudWatchDataSource
+    adapter = CloudWatchDataSource()
+    result = await asyncio.to_thread(adapter.test_connection)
+    if result["ok"]:
+        settings.update(cloudwatch_status="connected", cloudwatch_error=None)
+        from app.data_sources.base import registry
+        try:
+            await adapter.connect()
+            registry.register(adapter)
+            asyncio.create_task(_poll_cloud_adapter(adapter))
+        except Exception as exc:
+            logger.warning("CloudWatch re-registration failed: %s", exc)
+    else:
+        settings.update(cloudwatch_status="error", cloudwatch_error=result["message"])
+    return result
+
+
+@router.post("/azure")
+async def configure_azure(body: AzureMonitorConfig) -> dict:
+    """Save Azure Monitor credentials, test connection, and register the adapter."""
+    settings.update(
+        azure_tenant_id=body.tenant_id,
+        azure_client_id=body.client_id,
+        azure_client_secret=body.client_secret,
+        azure_subscription_id=body.subscription_id,
+        azure_resource_group=body.resource_group,
+        azure_poll_interval_seconds=body.poll_interval_seconds,
+    )
+    from app.data_sources.azure_monitor import AzureMonitorDataSource
+    adapter = AzureMonitorDataSource()
+    result = await asyncio.to_thread(adapter.test_connection)
+    if result["ok"]:
+        settings.update(azure_status="connected", azure_error=None)
+        from app.data_sources.base import registry
+        try:
+            await adapter.connect()
+            registry.register(adapter)
+            asyncio.create_task(_poll_cloud_adapter(adapter))
+        except Exception as exc:
+            logger.warning("Azure Monitor re-registration failed: %s", exc)
+    else:
+        settings.update(azure_status="error", azure_error=result["message"])
+    return result
+
+
+@router.post("/gcp")
+async def configure_gcp(body: GCPMonitoringConfig) -> dict:
+    """Save GCP credentials, test connection, and register the adapter."""
+    settings.update(
+        gcp_project_id=body.project_id,
+        gcp_service_account_json=body.service_account_json,
+        gcp_zone=body.zone,
+        gcp_poll_interval_seconds=body.poll_interval_seconds,
+    )
+    from app.data_sources.gcp_monitoring import GCPMonitoringDataSource
+    adapter = GCPMonitoringDataSource()
+    result = await asyncio.to_thread(adapter.test_connection)
+    if result["ok"]:
+        settings.update(gcp_status="connected", gcp_error=None)
+        from app.data_sources.base import registry
+        try:
+            await adapter.connect()
+            registry.register(adapter)
+            asyncio.create_task(_poll_cloud_adapter(adapter))
+        except Exception as exc:
+            logger.warning("GCP re-registration failed: %s", exc)
+    else:
+        settings.update(gcp_status="error", gcp_error=result["message"])
+    return result
+
+
+async def _poll_cloud_adapter(adapter) -> None:
+    """Drive a cloud adapter's polling loop through the main _process_event path."""
+    from app.main import _cloud_polling_loop
+    await _cloud_polling_loop(adapter)
 
 
 # ── Cache invalidation helpers ───────────────────────────────
