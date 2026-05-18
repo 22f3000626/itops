@@ -23,6 +23,20 @@ import { spring, stagger, fadeUp } from '../lib/motion';
 function useChartHistory(events: WsMetricEvent[], maxPoints = 32) {
   const [buf, setBuf] = useState<{ time: string; cpu: number; mem: number; err: number; lat: number }[]>([]);
 
+  // Seed with persisted history from the DB on first mount
+  useEffect(() => {
+    api.getMetricsHistory(maxPoints).then(history => {
+      if (history.length) {
+        setBuf(history.map(p => ({
+          ...p,
+          time: new Date(p.time + 'Z').toLocaleTimeString(),
+        })));
+      }
+    }).catch(() => {/* ignore — live data will fill in */});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Append each live WebSocket tick as a new point
   useEffect(() => {
     if (events.length) {
       const avg = (k: keyof WsMetricEvent['metrics']) =>

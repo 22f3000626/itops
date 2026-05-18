@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
-from app.api.schemas import InfraNodeOut, MetricSnapshotOut, DashboardStats
+from app.api.schemas import InfraNodeOut, MetricSnapshotOut, DashboardStats, MetricHistoryPoint
 from app.services.infra_service import InfraService
 
 router = APIRouter(prefix="/infrastructure", tags=["Infrastructure"])
@@ -77,6 +77,12 @@ def get_node_metrics(node_id: int, limit: int = 50, db: Session = Depends(get_db
         )
         for m in metrics
     ]
+
+
+@router.get("/metrics/history", response_model=list[MetricHistoryPoint])
+def get_metrics_history(points: int = 32, db: Session = Depends(get_db)):
+    svc = InfraService(db)
+    return svc.get_aggregated_history(points)
 
 
 @router.get("/dashboard", response_model=DashboardStats)

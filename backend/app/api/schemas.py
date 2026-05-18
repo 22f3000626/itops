@@ -171,6 +171,14 @@ class DashboardStats(BaseModel):
     memory_runbooks_stored: int
 
 
+class MetricHistoryPoint(BaseModel):
+    time: str
+    cpu: float
+    mem: float
+    err: float
+    lat: float
+
+
 # ── Runbook ─────────────────────────────────────────────────────────
 
 class RunbookEntryOut(BaseModel):

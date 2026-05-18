@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database.models import (
@@ -152,6 +153,33 @@ class InfraService:
             ts = log.timestamp.isoformat() if log.timestamp else "N/A"
             lines.append(f"[{ts}] {log.level} ({log.source}): {log.message}")
         return "\n".join(lines)
+
+    def get_aggregated_history(self, points: int = 32) -> list[dict]:
+        """Return up to `points` time-bucketed (per-second) fleet-wide averages."""
+        bucket = func.strftime('%Y-%m-%dT%H:%M:%S', MetricSnapshot.timestamp).label('bucket')
+        rows = (
+            self.db.query(
+                bucket,
+                func.avg(MetricSnapshot.cpu_percent).label('cpu'),
+                func.avg(MetricSnapshot.memory_percent).label('mem'),
+                func.avg(MetricSnapshot.error_rate).label('err'),
+                func.avg(MetricSnapshot.latency_ms).label('lat'),
+            )
+            .group_by(bucket)
+            .order_by(bucket.desc())
+            .limit(points)
+            .all()
+        )
+        return [
+            {
+                'time': row.bucket,
+                'cpu': round(row.cpu or 0, 1),
+                'mem': round(row.mem or 0, 1),
+                'err': round(row.err or 0, 1),
+                'lat': round(row.lat or 0, 1),
+            }
+            for row in reversed(rows)
+        ]
 
     def get_latest_metric_snapshot(self, node_id: int) -> MetricSnapshot | None:
         """Get the most recent metric snapshot for a node."""
